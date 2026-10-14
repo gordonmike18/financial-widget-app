@@ -1,0 +1,22 @@
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Local financial data
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+data/
+backups/
+exports/
+
+# Tooling and OS
+.claude/
+node_modules/
+.DS_Store
+*.log

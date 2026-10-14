@@ -1,0 +1,1831 @@
+<title>Purser LCARS Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Antonio:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;500;600&display=swap">
+<style>
+/* ═══ SKIN: LCARS (TNG) ══════════════════════════════════════════════════
+   Layout: TNG double-elbow console. A header frame and a main frame share one
+   left rail; modules float in open black space under bracket headers.
+   Every color, size and font below is a token. A future skin overrides the
+   tokens (see SKINS in the UI script) and, if it wants, its own frame renderer. */
+:root{
+  --bg:#000; --well:#0e0a08; --rule:#2a2320;
+  --ink:#f6e4cc; --ink-2:#c7b29a; --ink-3:#85766a;
+  --gold:#ff9c00; --peach:#ffcc99; --tangerine:#ff9966; --lavender:#cc99cc; --violet:#9977aa;
+  --lilac:#9999cc; --sky:#99ccff; --bluebell:#8899ff; --rose:#cc6666; --alert:#ff5a3c; --butter:#ffe0a3; --off:#352d29;
+  --spend:var(--tangerine); --earn:var(--sky); --save:var(--lavender); --net:var(--gold); --neg:var(--rose);
+  --space-1:#16102a; --space-2:#07060b;
+  --f-disp:'Antonio','Arial Narrow','Roboto Condensed',sans-serif;
+  --f-body:'Barlow Condensed','Arial Narrow','Roboto Condensed',sans-serif;
+  --rail:clamp(78px,10vw,164px); --bar:clamp(12px,1.2vw,18px); --gap:5px;
+  --ro:clamp(44px,5vw,84px); --ri:clamp(20px,2vw,32px);
+  --ease:cubic-bezier(.76,0,.24,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 15px/1.35 var(--f-body);overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+input,select{font:inherit}
+:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── Simulated desktop ── */
+#desk{position:fixed;inset:0;background:radial-gradient(120% 90% at 75% 8%,var(--space-1) 0%,var(--space-2) 58%,var(--bg) 100%);overflow:hidden}
+#stars{position:absolute;inset:0;width:100%;height:100%}
+.menubar{position:absolute;top:0;left:0;right:0;height:calc(28px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 16px 0;display:flex;align-items:center;gap:20px;background:rgba(18,14,24,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font:500 13px/1 -apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:#e9e3db;border-bottom:1px solid rgba(255,255,255,.06);z-index:1}
+.menubar b{font-weight:700}.menubar .dim{color:#a69c92}.menubar .sp{flex:1}
+@media (max-width:560px){.menubar .opt{display:none}}
+.desk-note{position:absolute;left:24px;right:24px;bottom:calc(22px + env(safe-area-inset-bottom,0px));max-width:470px;font:500 13px/1.5 var(--f-body);color:var(--ink-3);letter-spacing:.05em;text-transform:uppercase}
+.desk-note strong{color:var(--ink-2);font-weight:600}
+
+/* ── Compact widget (a full C-frame) ── */
+.widget{position:absolute;top:58px;right:40px;width:min(360px,calc(100vw - 32px));padding:9px;background:var(--bg);border-radius:30px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none;box-shadow:0 0 0 1px rgba(255,156,0,.18),0 24px 60px rgba(0,0,0,.75),0 0 90px rgba(255,156,0,.07);z-index:2}
+.widget.gone{visibility:hidden}
+.widget.dragging{cursor:grabbing;box-shadow:0 0 0 1px rgba(255,156,0,.4),0 30px 70px rgba(0,0,0,.8)}
+.widget.arrive{animation:arrive .8s ease-out}
+@keyframes arrive{0%{box-shadow:0 0 0 2px var(--gold),0 0 70px rgba(255,156,0,.7)}100%{box-shadow:0 0 0 1px rgba(255,156,0,.18),0 24px 60px rgba(0,0,0,.75),0 0 90px rgba(255,156,0,.07)}}
+.w{display:grid;grid-template-columns:52px minmax(0,1fr);grid-template-rows:18px auto 18px}
+.w-rail{grid-column:1;grid-row:1/4;display:flex;flex-direction:column;gap:4px}
+.w-rail>div{display:flex;align-items:flex-end;justify-content:flex-end;padding:0 6px 4px;font:500 10px/1 var(--f-disp);letter-spacing:.06em;color:#000}
+.w-el-t{background:var(--gold);border-top-left-radius:26px;height:50px}
+.w-mid{flex:1;background:var(--lavender)}
+.w-mid2{height:26px;background:var(--peach)}
+.w-el-b{background:var(--lilac);border-bottom-left-radius:26px;height:50px}
+.w-fill{grid-column:2;grid-row:2;background:linear-gradient(var(--gold) 50%,var(--lilac) 50%)}
+.w-body{grid-column:2;grid-row:2;background:var(--bg);border-radius:16px 0 0 16px;padding:10px 2px 12px 14px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.w-tb,.w-bb{grid-column:2;display:flex;gap:4px;align-items:stretch}
+.w-tb{grid-row:1}.w-bb{grid-row:3}
+.w-tb .s,.w-bb .s{background:var(--c);flex:1}
+.w-tb .cap,.w-bb .cap{flex:0 0 22px;border-radius:0 9px 9px 0}
+.w-t{font:600 15px/18px var(--f-disp);letter-spacing:.16em;color:var(--gold);padding:0 4px}
+.w-exp{display:flex;align-items:center;padding:0 10px;background:var(--gold);color:#000;font:600 12px/1 var(--f-disp);letter-spacing:.14em;border-radius:0 9px 9px 0;transition:background .2s}
+.widget:hover .w-exp,.widget:focus-visible .w-exp{background:var(--butter)}
+.w-r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.w-lbl{font:500 12px/1 var(--f-disp);letter-spacing:.14em;color:var(--ink-2)}
+.w-demo{font:500 10px/1 var(--f-disp);letter-spacing:.12em;color:var(--alert);border:1px solid var(--alert);border-radius:8px;padding:3px 6px 2px}
+.w-net{font:500 50px/.9 var(--f-disp);color:var(--net);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.w-net.neg{color:var(--neg)}
+.w-net .c{font-size:.42em;vertical-align:.95em;opacity:.8}
+.w-formula{font:400 11px/1 var(--f-disp);letter-spacing:.14em;color:var(--ink-3);margin-top:-4px}
+.w-trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.w-trio div{display:flex;flex-direction:column;gap:3px;border-top:3px solid var(--c);padding-top:4px}
+.w-trio span{font:500 10px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.w-trio b{font:500 18px/1 var(--f-disp);color:var(--ink);font-variant-numeric:tabular-nums}
+.w-free{display:flex;flex-direction:column;gap:4px}
+.w-free .row{display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 var(--f-disp);letter-spacing:.14em;color:var(--sky)}
+.w-free .row b{font:500 20px/1 var(--f-disp);color:var(--sky);letter-spacing:0}
+.w-meter{display:flex;gap:2px;height:7px}
+.w-meter i{flex:1;background:var(--off)}
+.w-meter i.on{background:var(--sky)}.w-meter i.rs{background:var(--peach)}
+.w-next{font:500 12px/1.2 var(--f-disp);letter-spacing:.08em;color:var(--peach)}
+.widget.launch .w-body>*{opacity:0;transition:opacity .14s}
+.widget.launch .w-exp{background:#fff}
+
+/* ── Console shell ── */
+.console{position:fixed;inset:0;z-index:10;background:var(--bg);display:grid;grid-template-rows:auto minmax(0,1fr);gap:calc(var(--gap)*2);padding:calc(10px + env(safe-area-inset-top,0px)) 12px calc(10px + env(safe-area-inset-bottom,0px)) 10px;overflow:hidden}
+.console.boot::after{content:'';position:absolute;left:0;right:0;top:0;height:2px;pointer-events:none;background:linear-gradient(90deg,transparent,var(--gold) 30%,var(--butter) 50%,var(--gold) 70%,transparent);box-shadow:0 0 18px var(--gold);animation:scan 1.05s .55s ease-in-out both}
+@keyframes scan{0%{transform:translateY(0);opacity:1}90%{opacity:.9}100%{transform:translateY(100vh);opacity:0}}
+.ghost{position:fixed;z-index:20;pointer-events:none;border:2px solid var(--gold);border-radius:26px;box-shadow:0 0 26px rgba(255,156,0,.55),inset 0 0 26px rgba(255,156,0,.25)}
+
+.blk{background:var(--c);color:#000;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 10px 6px;font:500 clamp(10px,.9vw,13px)/1 var(--f-disp);letter-spacing:.08em;text-transform:uppercase;text-align:right;min-height:24px;border:0}
+.seg{background:var(--c);flex:1 1 0;min-width:6px}
+.seg.cap{flex:0 0 calc(var(--bar)*1.7);border-radius:0 999px 999px 0}
+.seg-t{flex:0 0 auto;font:500 calc(var(--bar)*.92)/var(--bar) var(--f-disp);color:var(--c);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;padding:0 3px}
+@container (max-width:0px){.x{}}
+
+/* Header frame: elbow at bottom-left */
+.hf{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:auto var(--bar)}
+.hf-rail{grid-column:1;grid-row:1/3;display:flex;flex-direction:column;gap:var(--gap);position:relative;z-index:1}
+.hf-rail .blk{flex:0 0 auto;height:clamp(30px,3.6vw,46px)}
+.hf-rail .elbow{flex:1 1 auto;min-height:calc(var(--bar) + var(--ri) + 26px);border-bottom-left-radius:var(--ro);padding-bottom:calc(var(--bar) + 6px)}
+.hf-fill{grid-column:2;grid-row:1;background:var(--c)}
+.hf-body{grid-column:2;grid-row:1;background:var(--bg);border-bottom-left-radius:var(--ri);padding:4px 0 14px clamp(14px,1.8vw,26px);display:flex;flex-wrap:wrap;gap:12px 24px;justify-content:space-between;align-items:flex-start;min-width:0}
+.hf-bar{grid-column:2;grid-row:2;display:flex;gap:var(--gap);min-width:0;overflow:hidden}
+
+/* Main frame: elbow at top-left */
+.mf{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);grid-template-rows:var(--bar) minmax(0,1fr);min-height:0}
+.mf-rail{grid-column:1;grid-row:1/3;display:flex;flex-direction:column;gap:var(--gap);position:relative;z-index:2;min-height:0}
+.mf-rail .elbow{flex:0 0 auto;height:calc(var(--bar) + var(--ri) + clamp(24px,3.4vw,50px));border-top-left-radius:var(--ro)}
+.mf-rail .fill{flex:1 1 auto;min-height:12px}
+.mf-fill{grid-column:2;grid-row:2;background:var(--c)}
+.mf-body{grid-column:2;grid-row:2;background:var(--bg);border-top-left-radius:var(--ri);overflow:auto;min-height:0;min-width:0;padding:clamp(16px,1.8vw,26px) clamp(12px,1.4vw,22px) 48px clamp(20px,2.2vw,34px);container-type:inline-size;scrollbar-width:thin;scrollbar-color:var(--violet) transparent}
+.mf-bar{grid-column:2;grid-row:1;display:flex;gap:var(--gap);min-width:0;overflow:hidden}
+.navbtn{position:relative;cursor:pointer;flex:0 0 auto;height:clamp(40px,6.4vh,64px);font:500 clamp(12px,1.05vw,16px)/1 var(--f-disp);transition:filter .15s}
+.navbtn:hover{filter:brightness(1.15)}
+.navbtn .code{position:absolute;left:8px;top:6px;font-size:.66em;opacity:.65}
+.navbtn.on{--c:var(--butter)!important}
+.navbtn.on::after{content:'';position:absolute;right:-13px;top:24%;bottom:24%;width:8px;background:var(--c);border-radius:0 4px 4px 0}
+.navbtn kbd{font:inherit;font-size:.66em;opacity:.6;position:absolute;left:8px;bottom:6px}
+
+/* Header contents */
+.hdr-ctl{display:flex;flex-direction:column;gap:10px;min-width:0;padding-top:6px}
+.ctl-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.ctl-lbl{font:500 12px/1 var(--f-disp);letter-spacing:.16em;color:var(--ink-3)}
+.stepper{display:inline-flex;align-items:stretch;gap:var(--gap)}
+.stepper .lb{min-width:38px;padding:0 12px 7px}
+.step-lbl{display:inline-flex;align-items:center;justify-content:center;min-width:clamp(150px,14vw,214px);height:34px;padding:0 12px;font:500 17px/1 var(--f-disp);letter-spacing:.1em;color:var(--peach);box-shadow:inset 0 2px 0 var(--violet),inset 0 -2px 0 var(--violet)}
+.hdr-id{display:flex;flex-direction:column;align-items:flex-end;gap:7px;margin-left:auto;text-align:right}
+.title{font:600 clamp(40px,5.2vw,82px)/.84 var(--f-disp);letter-spacing:.05em;color:var(--gold);margin:0}
+.subtitle{font:400 clamp(11px,.95vw,14px)/1.2 var(--f-disp);letter-spacing:.24em;color:var(--peach)}
+.sd{font:400 12px/1 var(--f-disp);letter-spacing:.16em;color:var(--ink-3)}
+
+/* Buttons */
+.lb{--c:var(--lilac);appearance:none;border:0;background:var(--c);color:#000;cursor:pointer;font:500 clamp(13px,1vw,15px)/1 var(--f-disp);letter-spacing:.07em;text-transform:uppercase;height:34px;min-width:80px;padding:0 14px 7px;display:inline-flex;align-items:flex-end;justify-content:flex-end;text-align:right;transition:filter .15s,background-color .15s;white-space:nowrap}
+.lb:hover{filter:brightness(1.18)}
+.lb:active{filter:brightness(1.6)}
+.lb.round{border-radius:999px}.lb.rl{border-radius:999px 0 0 999px}.lb.rr{border-radius:0 999px 999px 0}
+.lb.on{--c:var(--butter)}
+.lb.sm{height:28px;min-width:0;font-size:13px;padding:0 12px 6px}
+.lb.wide{min-width:150px}
+.lb[disabled]{--c:var(--off);color:var(--ink-3);cursor:not-allowed;filter:none}
+.lb.collapse{--c:var(--rose);height:40px;min-width:min(240px,100%);font-size:17px;letter-spacing:.12em}
+.lb.hatch{background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.28) 0 5px,transparent 5px 10px)}
+.grp{display:inline-flex;gap:var(--gap);flex-wrap:wrap}
+.chip{--c:var(--ink-3);display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:12px;font:500 12px/1 var(--f-disp);letter-spacing:.12em;text-transform:uppercase;color:var(--c);box-shadow:inset 0 0 0 1.5px var(--c);white-space:nowrap}
+.chip.solid{background:var(--c);color:#000;box-shadow:none}
+.chip.demo{--c:var(--alert)}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:var(--c);animation:blink 2.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* Module header (bracket) */
+.mh{--c:var(--lilac);display:flex;align-items:center;gap:8px;margin-bottom:14px;min-width:0}
+.mh-cap{flex:0 0 16px;height:22px;background:var(--c);border-radius:11px 0 0 11px}
+.mh-t{font:500 clamp(15px,1.2vw,19px)/1 var(--f-disp);letter-spacing:.1em;color:var(--c);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.mh-line{flex:1 1 20px;height:6px;background:var(--c);min-width:12px}
+.mh-code{flex:0 0 auto;font:500 12px/1 var(--f-disp);color:#000;background:var(--c);padding:5px 10px 4px 8px;border-radius:0 11px 11px 0;letter-spacing:.08em;white-space:nowrap}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:34px 30px}
+.grid>*{min-width:0}
+.s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}.s3{grid-column:span 3}
+.stack{display:flex;flex-direction:column;gap:34px;min-width:0}
+@container (max-width:1180px){.s8,.s7,.s5,.s4{grid-column:span 12}.s3{grid-column:span 6}.s6{grid-column:span 12}}
+@container (max-width:640px){.grid>*{grid-column:span 12!important}}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 20px}
+@container (max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@container (max-width:420px){.metrics{grid-template-columns:minmax(0,1fr)}}
+.metric{--c:var(--spend);display:flex;flex-direction:column;gap:8px;min-width:0}
+.metric-tab{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;background:var(--c);color:#000;height:30px;padding:0 12px 5px 18px;border-radius:15px 0 0 15px;font:600 18px/1 var(--f-disp);letter-spacing:.16em}
+.metric-tab small{font-weight:400;font-size:11px;letter-spacing:.1em}
+.metric-val{font:500 clamp(36px,4.2vw,70px)/.95 var(--f-disp);color:var(--c);font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap}
+.metric-val .c{font-size:.42em;vertical-align:.95em;margin-left:1px;opacity:.75}
+.metric-sub{font:500 14px/1.35 var(--f-body);color:var(--ink-2);letter-spacing:.03em;min-height:2.7em}
+.metric.neg{--c:var(--neg)}
+.pend{display:inline-block;padding:0 6px;margin:1px 0;border-radius:3px;color:var(--c,var(--gold));box-shadow:inset 0 0 0 1.5px var(--c,var(--gold));background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c,var(--gold)) 22%,transparent) 0 4px,transparent 4px 8px);font:500 13px/1.5 var(--f-disp);letter-spacing:.06em;white-space:nowrap}
+.netnote{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:16px;padding:10px 14px;border-left:6px solid var(--gold);background:var(--well);font-size:15px;color:var(--ink-2)}
+.netnote b{color:var(--ink);font-weight:600}
+
+/* Allocation */
+.eq{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin-bottom:22px}
+.eq-b{--c:var(--sky);display:flex;flex-direction:column;justify-content:space-between;gap:6px;padding:8px 14px 8px 12px;border-left:8px solid var(--c);min-width:0}
+.eq-b span{font:500 12px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.eq-b b{font:500 clamp(24px,2.3vw,36px)/1 var(--f-disp);color:var(--ink);font-variant-numeric:tabular-nums}
+.eq-b.big{background:var(--c);border-radius:0 999px 999px 0;padding-right:30px}
+.eq-b.big span,.eq-b.big b{color:#000}
+.eq-op{align-self:center;font:400 34px/1 var(--f-disp);color:var(--ink-3);padding:0 2px}
+.abr{position:relative;height:22px;margin-bottom:6px;border-top:2px solid var(--sky);border-left:2px solid var(--sky);border-right:2px solid var(--sky);border-radius:8px 8px 0 0}
+.abr span{position:absolute;left:10px;top:-11px;background:var(--bg);padding:0 8px;font:500 12px/20px var(--f-disp);letter-spacing:.14em;color:var(--sky);white-space:nowrap}
+.abar{display:flex;gap:4px;height:46px}
+.abar button{--c:var(--sky);border:0;cursor:pointer;background:var(--c);min-width:8px;display:flex;align-items:flex-end;justify-content:flex-end;padding:0 8px 6px;color:#000;font:500 13px/1 var(--f-disp);letter-spacing:.08em;overflow:hidden;white-space:nowrap;transition:filter .15s}
+.abar button:hover{filter:brightness(1.18)}
+.abar button:first-child{border-radius:23px 0 0 23px}
+.abar button:last-child{border-radius:0 23px 23px 0}
+.abar .hatched{background:repeating-linear-gradient(135deg,var(--c) 0 6px,color-mix(in srgb,var(--c) 30%,transparent) 6px 12px)}
+.alegend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 18px;margin-top:16px}
+@container (max-width:760px){.alegend{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.alg{--c:var(--sky);display:flex;flex-direction:column;gap:3px;padding-left:10px;border-left:4px solid var(--c);min-width:0}
+.alg .k{font:500 12px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.alg .v{font:500 22px/1.1 var(--f-disp);font-variant-numeric:tabular-nums}
+.alg .n{font-size:13.5px;line-height:1.3;color:var(--ink-3)}
+.warn{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:9px 12px;border-left:6px solid var(--alert);background:var(--well);color:var(--ink);font-size:15px}
+
+/* Credit */
+.bigstat{--c:var(--sky);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.bigstat b{font:500 clamp(44px,4.4vw,66px)/.9 var(--f-disp);color:var(--c);font-variant-numeric:tabular-nums}
+.bigstat span{font:500 13px/1.2 var(--f-disp);letter-spacing:.14em;color:var(--ink-2)}
+.cu{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.cu-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font:500 14px/1 var(--f-disp);letter-spacing:.08em}
+.cu-h .r{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.cu-f{font-size:13.5px;color:var(--ink-3)}
+.segm{position:relative;display:flex;gap:3px;height:16px;padding-top:0}
+.segm i{flex:1;background:var(--off)}
+.segm i.on{background:var(--c)}
+.segm .mk{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink-2)}
+.segm.hasmk{margin-top:14px}
+.segm .mk span{position:absolute;top:-14px;left:3px;font:500 10px/1 var(--f-disp);color:var(--ink-3);letter-spacing:.06em;white-space:nowrap}
+.note{font-size:14.5px;line-height:1.4;color:var(--ink-2);padding:8px 12px;border-left:4px solid var(--c,var(--violet));background:var(--well)}
+.note b{color:var(--ink)}
+
+/* Charts */
+.chart{width:100%;overflow-x:auto;overflow-y:hidden}
+.chart svg{display:block;width:100%;height:auto;min-width:560px}
+.chart.small svg{min-width:0}
+svg text{font-family:var(--f-disp);letter-spacing:.06em}
+.ax{fill:var(--ink-3);font-size:12px}
+.legend{display:flex;flex-wrap:wrap;gap:var(--gap);margin-bottom:10px}
+.legend .lb{min-width:0}
+.legend .lb.offk{--c:var(--off);color:var(--ink-3)}
+.readout{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:4px 14px;align-items:end;margin-top:12px;padding:10px 14px;background:var(--well);border-left:6px solid var(--gold)}
+.readout .m{font:600 22px/1 var(--f-disp);letter-spacing:.1em;color:var(--gold);padding-right:6px}
+.readout div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.readout span{font:500 11px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.readout b{font:500 19px/1 var(--f-disp);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+@container (max-width:560px){.readout{grid-template-columns:repeat(2,minmax(0,1fr))}.readout .m{grid-column:span 2}}
+
+/* Lists */
+.list{display:flex;flex-direction:column;gap:3px}
+.lrow{--c:var(--ink-3);display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:3px 12px;align-items:center;padding:7px 10px 7px 10px;background:var(--well);border-left:4px solid var(--c);font-size:15px}
+.lrow .d{font:500 13px/1 var(--f-disp);letter-spacing:.06em;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.lrow .ds{min-width:0;overflow-wrap:anywhere;line-height:1.25}
+.lrow .ds small{display:block;color:var(--ink-3);font-size:13px}
+.lrow .amt{font:500 17px/1 var(--f-disp);font-variant-numeric:tabular-nums;color:var(--c);text-align:right;white-space:nowrap}
+.lrow .amt small{display:block;font-size:11px;letter-spacing:.08em;color:var(--ink-3);margin-top:3px}
+.lrow .tags{grid-column:2/4}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag{--c:var(--ink-3);font:500 11px/1 var(--f-disp);letter-spacing:.08em;padding:3px 6px 2px;border-radius:3px;background:var(--c);color:#000;text-transform:uppercase;white-space:nowrap}
+.tag.o{background:transparent;color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.tag.p{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 30%,transparent) 0 3px,transparent 3px 6px);color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
+.empty{padding:14px;color:var(--ink-3);font:500 14px/1.4 var(--f-disp);letter-spacing:.1em;text-transform:uppercase;border-left:4px solid var(--off)}
+.kv{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:6px 16px;font-size:15px}
+.kv dt{font:500 12px/1.6 var(--f-disp);letter-spacing:.14em;color:var(--ink-3);text-transform:uppercase}
+.kv dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+
+/* Insights */
+.ins{--c:var(--lavender);display:flex;flex-direction:column;gap:4px;padding:2px 0 2px 12px;border-left:6px solid var(--c);margin-bottom:14px}
+.ins b{font:500 13px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.ins p{margin:0;font-size:15.5px;line-height:1.38;color:var(--ink);max-width:62ch}
+
+/* Subscriptions */
+.subrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;margin-bottom:9px}
+.subrow .n{font-size:15px;overflow-wrap:anywhere}
+.subrow .v{font:500 15px/1 var(--f-disp);font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.subrow .b{grid-column:1/3;height:5px;background:var(--off);position:relative}
+.subrow .b i{position:absolute;inset:0 auto 0 0;background:var(--c,var(--violet))}
+.tot{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:2px solid var(--rule)}
+.tot span{font:500 12px/1 var(--f-disp);letter-spacing:.14em;color:var(--ink-3)}
+.tot b{font:500 24px/1 var(--f-disp);font-variant-numeric:tabular-nums}
+
+/* Accounts */
+.arow{--c:var(--sky);width:100%;display:grid;grid-template-columns:14px minmax(0,1fr) auto auto;align-items:center;gap:6px 14px;padding:0 14px 0 0;min-height:52px;background:var(--well);border:0;cursor:pointer;text-align:left;transition:background .15s}
+.arow:hover{background:#17110d}
+.arow .cap{align-self:stretch;background:var(--c)}
+.arow .nm{display:flex;flex-direction:column;gap:2px;padding:8px 0;min-width:0}
+.arow .nm b{font:500 18px/1.1 var(--f-disp);letter-spacing:.05em;color:var(--ink)}
+.arow .nm small{font-size:13.5px;color:var(--ink-3)}
+.arow .bal{font:500 22px/1 var(--f-disp);font-variant-numeric:tabular-nums;color:var(--c);text-align:right;white-space:nowrap}
+.arow .chev{font:500 14px/1 var(--f-disp);color:var(--ink-3);transition:transform .2s}
+.arow[aria-expanded="true"] .chev{transform:rotate(90deg);color:var(--c)}
+.arow .tags{grid-column:2/3;padding-bottom:8px;margin-top:-6px}
+.adet{--c:var(--sky);margin:3px 0 10px 14px;padding:14px 16px 16px;border-left:2px solid var(--c);border-bottom:2px solid var(--c);border-bottom-left-radius:16px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px 22px}
+@container (max-width:760px){.adet{grid-template-columns:minmax(0,1fr)}}
+.adet .full{grid-column:1/-1}
+.sublbl{font:500 12px/1 var(--f-disp);letter-spacing:.16em;color:var(--ink-3);margin-bottom:8px;text-transform:uppercase}
+.acts{display:flex;flex-wrap:wrap;gap:var(--gap)}
+.grp-gap{display:flex;flex-direction:column;gap:4px}
+
+/* Cash console */
+.cashtop{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.cashtop .v{font:500 clamp(46px,4.4vw,64px)/.9 var(--f-disp);color:var(--peach);font-variant-numeric:tabular-nums}
+.cashtop .v .c{font-size:.42em;vertical-align:.95em;opacity:.8}
+.cmodes{display:flex;flex-wrap:wrap;gap:var(--gap);margin-bottom:14px}
+.cmodes .lb{flex:1 1 auto;min-width:0}
+.cpad{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:14px 18px}
+@container (max-width:520px){.cpad{grid-template-columns:minmax(0,1fr)}}
+.amt-in{width:100%;height:58px;padding:0 14px;background:var(--bg);border:0;box-shadow:inset 0 0 0 2px var(--peach);border-radius:0 29px 29px 0;color:var(--peach);font:500 34px/1 var(--f-disp);text-align:right;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.amt-in:focus{outline:none;box-shadow:inset 0 0 0 3px var(--butter)}
+.keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap);margin-top:8px}
+.keys .lb{min-width:0;height:42px;font-size:19px;justify-content:center;align-items:center;padding:0}
+.txt-in{width:100%;height:36px;padding:0 12px;background:var(--well);border:0;box-shadow:inset 0 -2px 0 var(--violet);color:var(--ink);font-size:16px}
+.txt-in:focus{outline:none;box-shadow:inset 0 -2px 0 var(--butter)}
+.sel-in{height:36px;padding:0 10px;background:var(--well);color:var(--ink);border:0;box-shadow:inset 0 -2px 0 var(--violet);font-size:16px}
+label.fl{display:flex;flex-direction:column;gap:6px;font:500 12px/1 var(--f-disp);letter-spacing:.14em;color:var(--ink-3);text-transform:uppercase}
+.prev{display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--well);border-left:6px solid var(--c,var(--peach));font-size:15px;min-height:96px}
+.prev .ln{display:flex;justify-content:space-between;gap:10px;font:500 15px/1.2 var(--f-disp);letter-spacing:.06em}
+.prev .ln span{color:var(--ink-2)}
+.prev .ln b{font-weight:500;font-variant-numeric:tabular-nums}
+.prev .ok{color:var(--sky);font:500 13px/1.2 var(--f-disp);letter-spacing:.12em}
+.prev .bad{color:var(--alert);font:500 14px/1.3 var(--f-body)}
+.prev p{margin:0;color:var(--ink-3);font-size:14px;line-height:1.35}
+.match{--c:var(--peach);padding:12px 14px;background:var(--well);border-left:6px solid var(--c);display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.match .hd{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font:500 16px/1.2 var(--f-disp);letter-spacing:.05em}
+.match p{margin:0;font-size:15px;color:var(--ink-2);line-height:1.38}
+
+/* Tables */
+.tw{overflow-x:auto}
+.tbl{width:100%;border-collapse:separate;border-spacing:0 3px;font-size:14.5px;min-width:520px}
+.tbl th{font:500 11px/1.2 var(--f-disp);letter-spacing:.12em;color:var(--ink-3);text-align:right;padding:0 8px 4px;font-weight:500;text-transform:uppercase;vertical-align:bottom}
+.tbl td{background:var(--well);padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl th:first-child,.tbl td:first-child{text-align:left;white-space:normal}
+.tbl td:first-child{border-left:4px solid var(--c,var(--tangerine))}
+.tbl tfoot td{background:transparent;font:500 16px/1 var(--f-disp);color:var(--ink);border-top:2px solid var(--rule)}
+.tbl tfoot td:first-child{border-left-color:transparent}
+.pos{color:var(--sky)}.negc{color:var(--neg)}
+
+/* Projects */
+.psel{display:flex;flex-wrap:wrap;gap:var(--gap);margin-bottom:10px}
+.psel .lb{min-width:120px;height:40px;font-size:17px}
+.pdesc{color:var(--ink-2);font-size:16px;margin:0 0 24px;max-width:72ch}
+.tagrow{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:8px}
+.tagrow .k{font:500 13px/1 var(--f-disp);letter-spacing:.12em;color:var(--c)}
+.tagrow .b{height:12px;background:var(--off);position:relative}
+.tagrow .b i{position:absolute;inset:0 auto 0 0;background:var(--c)}
+.tagrow .v{font:500 14px/1 var(--f-disp);color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Ideas */
+.pipe{display:flex;gap:var(--gap);margin-bottom:16px;flex-wrap:wrap}
+.pipe .stg{--c:var(--sky);flex:1 1 120px;min-width:0;border:0;cursor:pointer;background:var(--c);color:#000;display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;gap:4px;height:74px;padding:8px 14px 8px;text-align:right;transition:filter .15s}
+.pipe .stg:hover{filter:brightness(1.15)}
+.pipe .stg:first-child{border-radius:37px 0 0 37px;padding-left:28px}
+.pipe .stg:last-child{border-radius:0 37px 37px 0;padding-right:28px}
+.pipe .stg b{font:500 30px/1 var(--f-disp)}
+.pipe .stg span{font:500 13px/1 var(--f-disp);letter-spacing:.14em}
+.pipe .stg.dim{--c:var(--off);color:var(--ink-2)}
+.pipe .arrow{display:none}
+.banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 14px;margin-bottom:22px;border:1.5px dashed var(--alert);color:var(--ink);font-size:15.5px}
+.banner b{font:500 14px/1 var(--f-disp);letter-spacing:.14em;color:var(--alert)}
+.pstat{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:24px}
+.pstat div{display:flex;flex-direction:column;gap:4px;padding-left:12px;border-left:6px solid var(--c)}
+.pstat span{font:500 12px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.pstat b{font:500 30px/1 var(--f-disp);font-variant-numeric:tabular-nums}
+.pstat small{font-size:13px;color:var(--ink-3)}
+.idea{--c:var(--sky);width:100%;display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:4px 14px;align-items:center;padding:0 14px 0 0;background:var(--well);border:0;cursor:pointer;text-align:left;margin-bottom:4px;min-height:64px}
+.idea:hover{background:#17110d}
+.idea.sel{box-shadow:inset 0 0 0 2px var(--c)}
+.idea .cap{align-self:stretch;background:var(--c);grid-row:1/3}
+.idea .t{padding-top:10px;font:500 17px/1.15 var(--f-disp);letter-spacing:.04em;color:var(--ink)}
+.idea .m{padding-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13.5px;color:var(--ink-3)}
+.idea .v{grid-row:1/3;font:500 18px/1 var(--f-disp);color:var(--c);text-align:right;white-space:nowrap}
+.stagebar{display:flex;gap:3px;margin:10px 0 18px}
+.stagebar i{flex:1;height:8px;background:var(--off)}
+.stagebar i.on{background:var(--c)}
+.dsec{margin-bottom:22px}
+.dtitle{font:500 clamp(24px,2.3vw,34px)/1.05 var(--f-disp);letter-spacing:.03em;color:var(--ink);margin:6px 0 6px}
+.fit{--c:var(--sky);display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-left:8px solid var(--c);background:var(--well)}
+.fit b{font:500 15px/1 var(--f-disp);letter-spacing:.14em;color:var(--c)}
+.fit ul{margin:0;padding-left:18px;color:var(--ink);font-size:15px;line-height:1.4}
+.step{display:flex;gap:12px;align-items:flex-start;width:100%;padding:9px 12px;background:var(--well);border:0;margin-bottom:3px;text-align:left;cursor:pointer;font-size:15.5px;line-height:1.35;color:var(--ink)}
+.step[disabled]{cursor:default}
+.step .bx{flex:0 0 22px;height:22px;border-radius:4px;box-shadow:inset 0 0 0 2px var(--lavender);display:flex;align-items:center;justify-content:center;font:600 14px/1 var(--f-disp);color:#000}
+.step.done .bx{background:var(--lavender)}
+.step.done span{color:var(--ink-2)}
+.guard{font-size:14.5px;color:var(--ink-2);padding:8px 12px;border-left:4px solid var(--rose);background:var(--well);margin-top:12px}
+
+/* Settings */
+.skins{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.skin{--c:var(--gold);display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--well);border-left:6px solid var(--c);min-width:0}
+.skin.cur{box-shadow:inset 0 0 0 2px var(--c)}
+.skin .sw{display:flex;height:26px;gap:3px}
+.skin .sw i{flex:1;border-radius:2px}
+.skin b{font:500 17px/1 var(--f-disp);letter-spacing:.06em}
+.skin small{color:var(--ink-3);font-size:13.5px}
+.perm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;align-items:center;padding:8px 12px;background:var(--well);margin-bottom:3px;font-size:15px}
+.rules{margin:0;padding:0;list-style:none;counter-reset:r;display:flex;flex-direction:column;gap:4px}
+.rules li{counter-increment:r;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;padding:8px 10px;background:var(--well);font-size:15px;line-height:1.38}
+.rules li::before{content:counter(r,decimal-leading-zero);font:500 16px/1.2 var(--f-disp);color:var(--gold)}
+.rules li b{color:var(--ink);font-weight:600}
+.rules li span{color:var(--ink-2)}
+.schem{display:flex;flex-direction:column;gap:4px}
+.schem div{--c:var(--lilac);display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;align-items:center;padding:7px 12px 7px 0;background:var(--well)}
+.schem div b{background:var(--c);color:#000;font:500 13px/1 var(--f-disp);letter-spacing:.1em;padding:8px 10px 6px;border-radius:0 14px 14px 0}
+.schem div span{font-size:14.5px;color:var(--ink-2)}
+@container (max-width:560px){.schem div{grid-template-columns:minmax(0,1fr)}.skins{grid-template-columns:minmax(0,1fr)}}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,160%);z-index:40;display:flex;align-items:stretch;gap:5px;background:var(--bg);padding:5px;border-radius:999px;box-shadow:0 10px 40px rgba(0,0,0,.8);transition:transform .35s var(--ease);max-width:calc(100vw - 32px)}
+.toast.show{transform:translate(-50%,0)}
+.toast .tc{background:var(--c,var(--gold));border-radius:999px 0 0 999px;flex:0 0 26px}
+.toast .tt{padding:9px 18px 8px 8px;font:500 15px/1.25 var(--f-disp);letter-spacing:.06em;color:var(--c,var(--gold));text-transform:uppercase}
+
+/* Boot / enter sequences */
+@keyframes sweepX{from{transform:scaleX(0)}to{transform:none}}
+@keyframes slideIn{from{transform:translateX(-120%)}to{transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes flash{0%{opacity:0}30%{opacity:1}45%{opacity:.4}60%{opacity:1}100%{opacity:1}}
+.console.boot .hf-bar>*,.console.boot .mf-bar>*{transform-origin:left;animation:sweepX .46s var(--ease) both;animation-delay:calc(.42s + var(--i,0)*.06s)}
+.console.boot .hf-rail>*,.console.boot .mf-rail>*{animation:slideIn .42s var(--ease) both;animation-delay:calc(.3s + var(--i,0)*.05s)}
+.console.boot .hf-fill,.console.boot .mf-fill{animation:flash .5s .5s both}
+.console.boot .hf-body>*{animation:rise .5s ease-out both;animation-delay:calc(.66s + var(--i,0)*.08s)}
+.console.boot .view>*>*{animation:rise .5s ease-out both;animation-delay:calc(.8s + var(--i,0)*.07s)}
+.console.boot .title{animation:flash .7s .7s both}
+.view.enter>*>*{animation:rise .34s ease-out both;animation-delay:calc(var(--i,0)*.045s)}
+.console.shutdown .hf-body,.console.shutdown .mf-body,.console.shutdown .hf-bar,.console.shutdown .mf-bar{transition:opacity .18s;opacity:0}
+.reduce *,.reduce *::before,.reduce *::after{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Narrow screens */
+@media (max-width:720px){
+  :root{--rail:68px;--gap:4px}
+  .console{padding-left:6px;padding-right:6px}
+  .hf-rail .blk:first-child{display:none}
+  .hdr-id{margin-left:0;align-items:flex-start;text-align:left;order:-1;width:100%}
+  .title{font-size:44px}
+  .navbtn{height:52px;font-size:12px;padding:0 6px 6px}
+  .navbtn .code,.navbtn kbd{display:none}
+  .lb.collapse{min-width:0}
+  .seg-t{display:none}
+}
+</style>
+
+<div id="desk">
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="menubar"><b>Purser</b><span class="opt">File</span><span class="opt">View</span><span class="opt">Window</span><span class="sp"></span><span class="dim" id="mb-clock"></span></div>
+  <div class="desk-note"><strong>Simulated desktop.</strong> In the native app this panel floats above your Mac desktop. Drag it anywhere. Click it, or press Enter, to open the console. Esc closes it.</div>
+  <div id="widget" class="widget" role="button" tabindex="0" aria-label="Purser widget. Open the finance console."></div>
+</div>
+<div id="console" class="console" hidden></div>
+<div id="ghost" class="ghost" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"><span class="tc"></span><span class="tt"></span></div>
+
+<script id="core">
+"use strict";
+/* ═══ CORE ══════════════════════════════════════════════════════════════
+   Pure data model and accounting. No DOM, no styling.
+   Phase 2 replaces MockProvider with a BackendProvider that reads the local
+   SQLite + Plaid service on the Mac mini. Everything below the provider
+   (Ledger, Calc) stays the same.                                           */
+
+const U = {
+  iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
+  parse(s){ const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); },
+  addDays(d, n){ const x = new Date(d); x.setDate(x.getDate()+n); return x; },
+  days(a, b){ return Math.round((U.parse(b) - U.parse(a)) / 86400000); },
+  r2(n){ return Math.round(n*100)/100; },
+  sum(arr, f){ let s = 0; for (const x of arr) s += f ? f(x) : x; return s; },
+  rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; },
+};
+
+/* ── LEDGER ────────────────────────────────────────────────────────────
+   One list of records. Projects are tags on these records, never copies.
+   Record kinds and how they count:
+     income     → EARN   (paychecks, interest, bonuses, cashback, resale payouts)
+     expense    → SPEND
+     refund     → reduces SPEND, links refundOf (rule 7)
+     saving     → SAVE   verified reduction vs. a documented baseline; no cash moves (rule 6)
+     transfer   → neither. Account to account: card payments, loan principal,
+                  investing, ATM withdrawals, cash deposits (rules 1–4, 9)
+     adjustment → neither. Cash count reconciliation
+     review     → neither. Synced bank item awaiting confirmation
+   Every record carries source + recordedAt (rule 10).                       */
+const Ledger = {
+  effect(t, id){
+    if (t.kind === 'saving') return 0;
+    if (t.kind === 'transfer') return (t.counterAccountId === id ? t.amount : 0) - (t.accountId === id ? t.amount : 0);
+    if (t.accountId !== id) return 0;
+    switch (t.kind){
+      case 'income': case 'refund': return t.amount;
+      case 'expense': return -t.amount;
+      case 'adjustment': case 'review': return t.dir * t.amount;
+    }
+    return 0;
+  },
+  balance(data, id, asOf){
+    const a = data.byId[id]; let b = a.opening || 0;
+    for (const t of data.tx){ if (t.status !== 'posted') continue; if (asOf && t.date > asOf) continue; b += Ledger.effect(t, id); }
+    return U.r2(b);
+  },
+};
+
+/* ── DATA PROVIDER (demo) ──────────────────────────────────────────────
+   Interface every provider implements:
+     load(today) → { today, trackingStart, accounts, tx, bills, projects,
+                     resale, sessions, timeLog, ideas, assets }
+   BackendProvider (Phase 2) will GET http://127.0.0.1:<port>/api/snapshot.
+   Plaid access tokens and secrets never leave that backend.                */
+const MockProvider = { id:'demo', label:'Demo provider', load(now){ return buildDemo(now || new Date()); } };
+
+function buildDemo(now){
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const TODAY = U.iso(today);
+  const rnd = U.rng(1701), r = (a,b) => a + (b-a)*rnd();
+  const N = 22;                                            // months of history
+  const md = (i, day) => { const b = new Date(today.getFullYear(), today.getMonth()-(N-1-i), 1); const last = new Date(b.getFullYear(), b.getMonth()+1, 0).getDate(); return new Date(b.getFullYear(), b.getMonth(), Math.min(day, last)); };
+  const ago = n => U.iso(U.addDays(today, -n));
+  const trackingStart = U.iso(md(0, 1));
+  const tx = []; let seq = 0;
+  const add = o => {
+    const date = typeof o.date === 'string' ? o.date : U.iso(o.date);
+    if (date > TODAY) return null;
+    const t = Object.assign({ status:'posted', source:'demo', projects:[], ai:null, category:'', sub:'', accountId:null, counterAccountId:null }, o);
+    t.id = 'd' + String(++seq).padStart(4, '0'); t.date = date; t.amount = U.r2(o.amount); t.recordedAt = date + 'T08:00:00Z';
+    tx.push(t); return t;
+  };
+  const xfer = (date, from, to, amount, desc, sub) => add({ date, kind:'transfer', sub, accountId:from, counterAccountId:to, amount, desc, category:'Transfer' });
+
+  // Auto loan: $21,300 at 5.9% APR, 60 months. 20 payments made before tracking began.
+  const LOAN = { original:21300, apr:0.059, payment:412 };
+  let loanBal = LOAN.original; for (let k=0; k<20; k++) loanBal = loanBal*(1+LOAN.apr/12) - LOAN.payment;
+  loanBal = U.r2(loanBal); const loanOpening = loanBal;
+
+  const groceries = ['GREENLEAF MARKET','HARBOR FOODS CO-OP','GREENLEAF MARKET','CORNER GROCER'];
+  const dining = ['NORI NOODLE BAR','THE COPPER KETTLE','BLUE DOOR TACOS','RIVERSIDE PIZZA','DAYBREAK CAFE'];
+  const shops = ['HOME GOODS DEPOT','ONLINE MARKETPLACE','HARDWARE CENTRAL','BOOKS & BEYOND'];
+  const cashSpots = ['FARMERS MARKET','BARBER — FADE SHOP','FOOD TRUCK','PARKING METER','COFFEE CART'];
+
+  for (let i=0; i<N; i++){
+    const age = N-1-i, D = day => md(i, day);
+    const pay = age >= 10 ? 2315.40 : 2412.85;
+    add({ date:D(1), desc:'PAYROLL DIRECT DEP — KESTREL LOGISTICS', kind:'income', sub:'paycheck', category:'Salary', amount:pay, accountId:'checking' });
+    if (age === 2){
+      add({ date:D(15), desc:'PAYROLL DIRECT DEP — KESTREL LOGISTICS (split)', kind:'income', sub:'paycheck', category:'Salary', amount:pay-1000, accountId:'checking' });
+      add({ date:D(15), desc:'PAYROLL DIRECT DEP — KESTREL LOGISTICS (split)', kind:'income', sub:'paycheck', category:'Salary', amount:1000, accountId:'halyard' });
+      xfer(D(3), 'checking', 'halyard', 25, 'OPENING DEPOSIT — HALYARD CU', 'internal');
+    } else add({ date:D(15), desc:'PAYROLL DIRECT DEP — KESTREL LOGISTICS', kind:'income', sub:'paycheck', category:'Salary', amount:pay, accountId:'checking' });
+    add({ date:D(28), desc:'INTEREST PAID', kind:'income', sub:'interest', category:'Interest', amount:(4000+400*i)*0.04/12, accountId:'savings' });
+    const fl = {15:420, 11:575, 6:360, 2:610}[age];
+    if (fl) add({ date:D(18), desc:'CLIENT PAYMENT — WEB MAINTENANCE', kind:'income', sub:'freelance', category:'Freelance', amount:fl, accountId:'checking' });
+
+    // Fixed bills
+    add({ date:D(1), desc:'ALDERWOOD PROPERTIES — RENT', kind:'expense', category:'Housing', amount:1650, accountId:'checking' });
+    const season = [1.25,1.15,1.0,.85,.8,1.05,1.3,1.35,1.05,.85,.95,1.2][md(i,1).getMonth()];
+    add({ date:D(22), desc:'CITY POWER & LIGHT', kind:'expense', category:'Utilities', amount:76*season + r(-6,6), accountId:'checking' });
+    add({ date:D(5), desc:'SKYLINE FIBER INTERNET', kind:'expense', category:'Utilities', amount:70, accountId:'corvus' });
+    add({ date:D(12), desc:'NORTHWIND WIRELESS', kind:'expense', category:'Phone', amount:age >= 5 ? 85 : 65, accountId:'corvus' });
+    if (age < 5) add({ date:D(12), desc:'Wireless plan renegotiated', kind:'saving', category:'Phone', amount:20, baseline:{ label:'Northwind plan before renegotiation', was:85, now:65 } });
+    if (age >= 7) add({ date:D(12), desc:'GUARDIAN MUTUAL AUTO INS', kind:'expense', category:'Insurance', amount:168, accountId:'checking' });
+    else {
+      add({ date:D(12), desc:'BEACON AUTO INSURANCE', kind:'expense', category:'Insurance', amount:121, accountId:'checking' });
+      add({ date:D(12), desc:'Auto insurance — switched carriers', kind:'saving', category:'Insurance', amount:47, projects:['aicraft'], ai:'researched', baseline:{ label:'Guardian Mutual premium (2025 policy)', was:168, now:121 } });
+    }
+    add({ date:D(2), desc:'IRONWORKS GYM', kind:'expense', sub:'subscription', category:'Fitness', amount:35, accountId:'checking' });
+    add({ date:D(18), desc:'STREAMVIEW PREMIUM', kind:'expense', sub:'subscription', category:'Entertainment', amount:15.49, accountId:'meridian' });
+    add({ date:D(7), desc:'TONEWAVE MUSIC', kind:'expense', sub:'subscription', category:'Entertainment', amount:10.99, accountId:'meridian' });
+    add({ date:D(3), desc:'CLOUDBOX 200 GB', kind:'expense', sub:'subscription', category:'Software', amount:2.99, accountId:'corvus' });
+    if (age >= 4) add({ date:D(9), desc:'DAILY LEDGER DIGITAL', kind:'expense', sub:'subscription', category:'News', amount:22.99, accountId:'corvus' });
+    else add({ date:D(9), desc:'News subscription cancelled', kind:'saving', category:'News', amount:22.99, projects:['aicraft'], ai:'organized', baseline:{ label:'Daily Ledger Digital', was:22.99, now:0 } });
+
+    // AI Craft
+    add({ date:D(11), desc:'ANTHROPIC — CLAUDE PRO', kind:'expense', sub:'subscription', category:'AI subscriptions', amount:20, accountId:'corvus', projects:['aicraft'] });
+    if (age <= 16) add({ date:D(19), desc:'OPENAI — CHATGPT PLUS', kind:'expense', sub:'subscription', category:'AI subscriptions', amount:20, accountId:'corvus', projects:['aicraft'] });
+    if (age === 8) add({ date:D(9), desc:'APPLE STORE — MAC MINI', kind:'expense', category:'AI hardware', amount:1399, accountId:'corvus', projects:['aicraft'] });
+    if (age <= 8){
+      add({ date:D(28), desc: i%2 ? 'ANTHROPIC — API USAGE' : 'OPENAI — API USAGE', kind:'expense', category:'AI API', amount:r(6,38), accountId:'corvus', projects:['aicraft'] });
+      add({ date:D(1), desc:'NIMBUS VPS — HOSTING', kind:'expense', sub:'subscription', category:'AI hosting', amount:12, accountId:'corvus', projects:['aicraft'] });
+    }
+    if (age === 6) add({ date:D(14), desc:'LOCAL MODEL TOOLKIT — LICENSE', kind:'expense', category:'AI software', amount:49, accountId:'corvus', projects:['aicraft'] });
+
+    // Everyday spending
+    [3,9,15,21,27].forEach((dd,k) => add({ date:D(dd), desc:groceries[(i+k)%4], kind:'expense', category:'Groceries', amount:r(38,142), accountId:'corvus' }));
+    [6,13,20,26].forEach((dd,k) => add({ date:D(dd), desc:dining[(i+k)%5], kind:'expense', category:'Dining', amount:r(12,64), accountId:'meridian' }));
+    [8,17,25].forEach(dd => add({ date:D(dd), desc:'SHELLBY FUEL', kind:'expense', category:'Fuel', amount:r(34,56), accountId:'corvus' }));
+    [11,23].forEach((dd,k) => add({ date:D(dd), desc:shops[(i+k)%4], kind:'expense', category:'Shopping', amount:r(18,160), accountId:'meridian' }));
+
+    // Cash on hand
+    [4,14,24].forEach((dd,k) => add({ date:D(dd), desc:cashSpots[(i+k)%5], kind:'expense', category:'Cash purchases', amount:r(9,32), accountId:'cash' }));
+    if (age % 3 === 0 && age > 0) xfer(D(6), 'checking', 'cash', 200, 'ATM WITHDRAWAL — HARBOR ST', 'atm');
+    if (age === 12 || age === 4) xfer(D(20), 'cash', 'checking', 150, 'BRANCH DEPOSIT — CASH', 'cash_deposit');
+
+    // Auto loan: interest is Spend, principal is a transfer (rule 3)
+    const pd = D(22);
+    if (U.iso(pd) <= TODAY){
+      const interest = U.r2(loanBal*LOAN.apr/12), principal = U.r2(LOAN.payment - interest);
+      add({ date:pd, desc:'AUTO LOAN — INTEREST PORTION', kind:'expense', category:'Loan interest', amount:interest, accountId:'checking' });
+      xfer(pd, 'checking', 'loan', principal, 'AUTO LOAN — PRINCIPAL PORTION', 'loan_principal');
+      loanBal = U.r2(loanBal - principal);
+    }
+    // Investing and saving are asset moves, not consumption (rule 4)
+    xfer(D(3), 'checking', 'brokerage', 500, 'TRANSFER TO NORTHSTAR BROKERAGE', 'invest');
+    xfer(D(3), 'checking', 'roth', 300, 'ROTH IRA CONTRIBUTION', 'invest');
+    if (age % 3 === 0) xfer(D(10), 'checking', 'crypto', 100, 'COINVAULT PURCHASE', 'invest');
+    xfer(D(16), 'checking', 'savings', 400, 'TRANSFER TO HIGH-YIELD SAVINGS', 'internal');
+  }
+
+  // Gambling: one record per session at the net result, so Earn and Spend are not both inflated
+  const sessions = [];
+  [[17,9,'Poker night',60,0],[13,21,'Poker night',100,185],[9,5,'Card room',50,20],[5,17,'Poker night',80,160],[3,26,'Sportsbook (cash)',40,0],[1,12,'Poker night',60,95]].forEach(([age,day,venue,stake,out]) => {
+    const net = out - stake, date = md(N-1-age, day);
+    const t = add({ date, desc:'GAMBLING — '+venue.toUpperCase()+(net >= 0 ? ' (NET WIN)' : ' (NET LOSS)'), kind: net >= 0 ? 'income' : 'expense', category:'Gambling', amount:Math.abs(net), accountId:'cash', projects:['gambling'] });
+    if (t) sessions.push({ id:t.id, date:t.date, venue, stake, cashout:out, net });
+  });
+
+  // Resale: payout (gross − platform fees) is Earn, shipping is Spend.
+  // Original cost predates tracking, so it is shown as cost basis for P/L, never re-counted as Spend (rule 5).
+  const resale = [];
+  [
+    { age:19, day:10, item:'Analog delay pedal', acquired:'2021', cost:229, gross:185, fees:24.05, ship:11.20, to:'checking' },
+    { age:14, day:16, item:'Tablet (2020, 64 GB)', acquired:'2020', cost:599, gross:310, fees:40.30, ship:14.85, to:'checking' },
+    { age:10, day:7,  item:'15W tube combo amp (local, cash)', acquired:'2019', cost:549, gross:480, fees:0, ship:0, to:'cash' },
+    { age:7,  day:21, item:'Modulation pedal', acquired:'2022', cost:299, gross:255, fees:33.15, ship:12.40, to:'checking', ai:'assisted' },
+    { age:3,  day:13, item:'27-inch 4K monitor', acquired:'2021', cost:329, gross:210, fees:27.30, ship:0, to:'checking', ai:'assisted' },
+    { age:1,  day:9,  item:'MIDI keyboard controller', acquired:'2022', cost:189, gross:140, fees:18.20, ship:16.75, to:'checking', ai:'assisted' },
+    { pending:true, item:'Mechanical keyboard', acquired:'2023', cost:175, gross:162, fees:20, ship:12.10, to:'checking', ai:'assisted' },
+  ].forEach(s => {
+    const projects = s.ai ? ['resale','aicraft'] : ['resale'];
+    const date = s.pending ? ago(1) : md(N-1-s.age, s.day);
+    const shipDate = s.pending ? ago(3) : md(N-1-s.age, Math.max(1, s.day-2));
+    const pay = add({ date, desc:(s.to === 'cash' ? 'CASH SALE — ' : 'MARKETPLACE PAYOUT — ')+s.item.toUpperCase(), kind:'income', sub:'resale', category:'Resale', amount:s.gross - s.fees, accountId:s.to, projects, ai:s.ai || null, status:s.pending ? 'pending' : 'posted' });
+    const ship = s.ship ? add({ date:shipDate, desc:'SHIPPING LABEL — '+s.item.toUpperCase(), kind:'expense', category:'Resale shipping', amount:s.ship, accountId:'corvus', projects }) : null;
+    if (pay) resale.push({ item:s.item, acquired:s.acquired, cost:s.cost, gross:s.gross, fees:s.fees, ship:s.ship, payoutId:pay.id, shipId:ship && ship.id, date:pay.date, ai:s.ai || null });
+  });
+
+  // Bonuses and fees
+  add({ date:md(N-6, 14), desc:'CORVUS — ANNUAL FEE', kind:'expense', category:'Card fees', amount:95, accountId:'corvus', projects:['bonuses'] });
+  add({ date:md(N-6, 20), desc:'CORVUS — WELCOME BONUS (STATEMENT CREDIT)', kind:'income', sub:'bonus', category:'Bonuses', amount:600, accountId:'corvus', projects:['bonuses','aicraft'], ai:'discovered' });
+  add({ date:md(N-4, 8), desc:'KEEL FEDERAL — DIRECT DEPOSIT PROMO', kind:'income', sub:'bonus', category:'Bonuses', amount:300, accountId:'checking', projects:['bonuses','aicraft'], ai:'discovered' });
+  const halyardBonus = add({ date:ago(2), desc:'HALYARD CU — NEW MEMBER BONUS', kind:'income', sub:'bonus', category:'Bonuses', amount:200, accountId:'halyard', projects:['bonuses','aicraft'], ai:'discovered', status:'pending', ideaId:'idea-halyard' });
+
+  // A refund adjusts the period it posts in (rule 7)
+  const hp = add({ date:md(N-3, 4), desc:'SOUNDSHACK — HEADPHONES', kind:'expense', category:'Shopping', amount:129, accountId:'meridian' });
+  if (hp) add({ date:md(N-3, 19), desc:'SOUNDSHACK — RETURN CREDIT', kind:'refund', category:'Shopping', amount:129, accountId:'meridian', refundOf:hp.id });
+
+  // Pending card charges
+  add({ date:ago(0), desc:'GREENLEAF MARKET', kind:'expense', category:'Groceries', amount:63.40, accountId:'corvus', status:'pending' });
+  add({ date:ago(1), desc:'NORI NOODLE BAR', kind:'expense', category:'Dining', amount:24.18, accountId:'meridian', status:'pending' });
+
+  // Cashback, then card payments. Each card is paid in full on the 25th/27th for last month (rule 2).
+  const mk = i => U.iso(md(i,1)).slice(0,7);
+  const cardNet = (card, k) => U.sum(tx.filter(t => t.status === 'posted' && t.accountId === card && t.date.slice(0,7) === k), t => t.kind === 'expense' ? t.amount : (t.kind === 'refund' || t.kind === 'income') ? -t.amount : 0);
+  for (let i=1; i<N; i++){
+    const base = U.sum(tx.filter(t => t.status === 'posted' && t.accountId === 'corvus' && t.kind === 'expense' && t.date.slice(0,7) === mk(i-1)), t => t.amount);
+    add({ date:md(i,26), desc:'CORVUS — 1.5% CASHBACK', kind:'income', sub:'cashback', category:'Cashback', amount:base*0.015, accountId:'corvus', projects:['bonuses'] });
+  }
+  for (let i=1; i<N; i++){
+    xfer(md(i,25), 'checking', 'corvus', cardNet('corvus', mk(i-1)), 'PAYMENT — CORVUS REWARDS VISA', 'cc_payment');
+    xfer(md(i,27), 'checking', 'meridian', cardNet('meridian', mk(i-1)), 'PAYMENT — MERIDIAN CASH CARD', 'cc_payment');
+  }
+
+  // Synced bank items that might be cash movements. They wait for confirmation.
+  add({ date:ago(2), desc:'ATM WITHDRAWAL #4471 HARBOR ST', kind:'review', dir:-1, amount:120, accountId:'checking', category:'Needs review', match:{ suggest:'atm', confidence:'HIGH', why:'ATM terminal ID in description. Round amount.' } });
+  add({ date:ago(3), desc:'DEPOSIT BR 0119 TELLER', kind:'review', dir:1, amount:200, accountId:'checking', category:'Needs review', match:{ suggest:'deposit', confidence:'MEDIUM', why:'Teller deposit with no check image attached. Could be cash or a paper check.' } });
+
+  tx.sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1);
+
+  const matures = U.iso(new Date(today.getFullYear(), today.getMonth()+5, 15));
+  const accounts = [
+    { id:'checking', name:'Everyday Checking', inst:'Keel Federal CU', mask:'4417', type:'checking', group:'cash', ledger:true, c:'sky', target:3842.17, plaid:'Balance, Transactions' },
+    { id:'halyard', name:'Bonus Checking', inst:'Halyard Credit Union', mask:'0193', type:'checking', group:'cash', ledger:true, c:'bluebell', opening:0, plaid:'Balance, Transactions' },
+    { id:'savings', name:'High-Yield Savings', inst:'Keel Federal CU', mask:'8820', type:'savings', group:'cash', ledger:true, c:'lilac', target:12450, apy:4.0, plaid:'Balance, Transactions' },
+    { id:'cash', name:'Cash on Hand', inst:'Physical cash · manual', mask:'', type:'cash', group:'cash', ledger:true, c:'peach', opening:500, manual:true },
+    { id:'cd', name:'12-Month Certificate', inst:'Keel Federal CU', mask:'2210', type:'cd', group:'cash', ledger:true, c:'violet', opening:5000, restricted:true, restrictedNote:'Locked until '+matures+'. Early withdrawal costs 90 days of interest.', plaid:'Balance' },
+    { id:'brokerage', name:'Taxable Brokerage', inst:'Northstar Investing', mask:'3307', type:'brokerage', group:'invest', c:'lavender', value:18920.44, holdings:[['Total US stock index ETF',41.2,12187.31],['Total international ETF',72.5,4896.69],['Cash sweep',null,0]], plaid:'Investments (holdings)' },
+    { id:'roth', name:'Roth IRA', inst:'Northstar Investing', mask:'3308', type:'retirement', group:'invest', c:'lavender', value:24310.08, longTerm:true, holdings:[['Target-date 2060 fund',318.4,24310.08]], plaid:'Investments (holdings)' },
+    { id:'crypto', name:'Crypto Wallet', inst:'Coinvault', mask:'9F2A', type:'crypto', group:'invest', c:'violet', value:3180.55, holdings:[['Bitcoin',0.0281,2214.40],['Ether',0.41,0]], plaid:'Investments (where supported)' },
+    { id:'corvus', name:'Rewards Visa', inst:'Corvus Card', mask:'1092', type:'credit', group:'credit', ledger:true, c:'tangerine', opening:0, limit:12000, apr:22.99, plaid:'Liabilities, Transactions' },
+    { id:'meridian', name:'Cash Back Card', inst:'Meridian Bank', mask:'6631', type:'credit', group:'credit', ledger:true, c:'peach', opening:0, limit:6500, apr:24.49, plaid:'Liabilities, Transactions' },
+    { id:'loan', name:'Auto Loan', inst:'Keel Federal CU', mask:'5521', type:'loan', group:'loan', ledger:true, c:'rose', opening:-loanOpening, original:LOAN.original, apr:5.9, payment:LOAN.payment, plaid:'Liabilities' },
+  ];
+  // Holdings: last row takes the remainder so holdings always sum to the account value
+  for (const a of accounts) if (a.holdings){ const rest = a.value - U.sum(a.holdings.slice(0,-1), h => h[2]); a.holdings[a.holdings.length-1][2] = U.r2(rest); }
+  const data = { provider:'demo', today:TODAY, trackingStart, accounts, tx, sessions, resale };
+  data.byId = Object.fromEntries(accounts.map(a => [a.id, a]));
+  // Solve opening balances so the ledger lands on the snapshot balances
+  for (const a of accounts) if (a.target != null){ a.opening = 0; a.opening = U.r2(a.target - Ledger.balance(data, a.id)); }
+  // Investment value history: walk back from today's value, removing contributions
+  for (const a of accounts) if (a.group === 'invest'){
+    const h = [a.value]; let v = a.value;
+    for (let k=1; k<12; k++){ const contrib = a.id === 'brokerage' ? 500 : a.id === 'roth' ? 300 : (k % 3 === 0 ? 100 : 0); v = (v - contrib) / (1 + r(-0.035, 0.05)); h.unshift(U.r2(v)); }
+    a.history = h;
+  }
+  a_lastSync(accounts, now);
+
+  data.bills = [
+    { id:'rent', name:'Rent — Alderwood', day:1, amount:1650, from:'checking', kind:'Housing' },
+    { id:'gym', name:'Ironworks Gym', day:2, amount:35, from:'checking', kind:'Subscription' },
+    { id:'ins', name:'Beacon Auto Insurance', day:12, amount:121, from:'checking', kind:'Insurance' },
+    { id:'elec', name:'City Power & Light', day:22, estimate:'CITY POWER', from:'checking', kind:'Utility' },
+    { id:'loan', name:'Auto loan payment', day:22, amount:412, from:'checking', kind:'Loan', note:'Principal portion is a transfer; only interest counts as Spend.' },
+    { id:'corvus', name:'Corvus Visa statement', day:25, card:'corvus', from:'checking', kind:'Card' },
+    { id:'meridian', name:'Meridian Card statement', day:27, card:'meridian', from:'checking', kind:'Card' },
+    { id:'net', name:'Skyline Fiber', day:5, amount:70, from:'corvus', kind:'Utility' },
+    { id:'phone', name:'Northwind Wireless', day:12, amount:65, from:'corvus', kind:'Phone' },
+    { id:'cloud', name:'Cloudbox', day:3, amount:2.99, from:'corvus', kind:'Subscription' },
+    { id:'music', name:'Tonewave Music', day:7, amount:10.99, from:'meridian', kind:'Subscription' },
+    { id:'claude', name:'Claude Pro', day:11, amount:20, from:'corvus', kind:'AI Craft' },
+    { id:'stream', name:'Streamview', day:18, amount:15.49, from:'meridian', kind:'Subscription' },
+    { id:'gpt', name:'ChatGPT Plus', day:19, amount:20, from:'corvus', kind:'AI Craft' },
+    { id:'vps', name:'Nimbus VPS', day:1, amount:12, from:'corvus', kind:'AI Craft' },
+  ];
+  data.projects = [
+    { id:'aicraft', name:'AI Craft', c:'sky', desc:'The financial footprint of the AI hobby: hardware, subscriptions, API, hosting, and the measurable outcomes AI was involved in. No payback meter by design.' },
+    { id:'resale', name:'Resale', c:'tangerine', desc:'Selling personal equipment. Separates cash proceeds (counted in Earn) from economic profit or loss against what each item originally cost.' },
+    { id:'bonuses', name:'Bonuses', c:'gold', desc:'Bank and card welcome bonuses, cashback, and the fees that come with them. Only posted rewards count.' },
+    { id:'gambling', name:'Gambling', c:'rose', optional:true, desc:'Optional. Each session is recorded once at its net result, so stakes do not inflate Spend and cash-outs do not inflate Earn.' },
+  ];
+  data.timeLog = [
+    { date:md(N-7,6) && U.iso(md(N-7,6)), hours:2.5, note:'Auto insurance re-quote research', ai:'researched' },
+    { date:U.iso(md(N-6,2)), hours:2.0, note:'Card welcome offer comparison', ai:'discovered' },
+    { date:U.iso(md(N-5,18)), hours:3.0, note:'Resale listings (photos, copy, pricing)', ai:'assisted' },
+    { date:U.iso(md(N-4,3)), hours:1.0, note:'Subscription audit', ai:'organized' },
+    { date:U.iso(md(N-2,20)), hours:1.5, note:'Bonus requirement tracking sheet', ai:'organized' },
+  ];
+  data.assets = [
+    { name:'2021 compact hatchback', acquired:'2023', price:24600, financing:'Auto loan, Keel Federal', loan:'loan', project:null },
+    { name:'Mac mini (AI workstation)', acquired:U.iso(md(N-9,9)), price:1399, financing:'Corvus Visa, paid in full', project:'aicraft' },
+    { name:'Electric guitars (2) + acoustic', acquired:'various', price:null, financing:'Paid', project:null },
+    { name:'Studio monitors (pair)', acquired:'2022', price:398, financing:'Paid', project:'resale', note:'Flagged in Ideas as a resale candidate' },
+  ];
+  data.ideas = buildIdeas(today, ago, halyardBonus);
+  return data;
+}
+function a_lastSync(accounts, now){ for (const a of accounts) a.lastSync = a.manual ? 'Manual entry' : 'Demo snapshot · ' + now.toTimeString().slice(0,5); }
+
+function buildIdeas(today, ago, halyardBonus){
+  const inDays = n => U.iso(U.addDays(today, n));
+  return [
+    { id:'idea-halyard', stage:'reconcile', type:'Bank bonus', title:'Halyard Credit Union — $200 checking bonus', value:200, valueText:'$200 cash', realizeAs:'income', account:'halyard', projects:['bonuses','aicraft'], ai:'discovered', pendingTxn:halyardBonus && halyardBonus.id,
+      summary:'New-member checking bonus. You opened the account and routed $1,000 of one paycheck to it. Halyard now lists the bonus as pending.',
+      eval:{ Eligibility:'New members only. You have never held a Halyard account.', Requirements:'One direct deposit of $1,000 or more within 60 days of opening.', Fees:'None with any monthly direct deposit. Otherwise $5/month.', Deadline:'Keep the account open 6 months or the bonus can be reclaimed.', Credit:'Soft inquiry only (ChexSystems). No effect on credit score.', Benefit:'$200, reported as interest income (1099-INT).' },
+      fit:{ level:'GOOD', why:['No spending requirement.','The payroll split can be reversed after the bonus posts.'] },
+      steps:['Confirm you have never held a Halyard account','Open the account yourself on Halyard’s website','Route at least $1,000 of one paycheck by direct deposit','Add the account to Purser so deposits are tracked'], done:[0,1,2,3],
+      reqs:[{ label:'Direct deposit of $1,000 or more', cur:1000, target:1000, unit:'$' }], status:'Bonus shows as pending at Halyard. Record it when it posts.' },
+    { id:'idea-voyager', stage:'track', type:'Card welcome offer', title:'Corvus Voyager Card — $750 welcome offer', value:750, valueText:'$750 after $4,000 spend', realizeAs:'income', account:'checking', projects:['bonuses','aicraft'], ai:'discovered',
+      summary:'Travel card offer. $750 after $4,000 in purchases within 90 days of approval. You applied 41 days ago.',
+      eval:{ Eligibility:'Not eligible if you received a Corvus welcome bonus in the past 24 months on this card family. You qualify.', Requirements:'$4,000 in purchases within 90 days.', Fees:'$95 annual fee, charged in month one.', Deadline:'Spend window ends '+inDays(49)+'.', Credit:'Hard inquiry. Lowers average account age slightly.', Benefit:'$750 minus the $95 fee = $655 in year one.' },
+      fitRule:'cardSpend', spendTarget:4000,
+      steps:['Read the full offer terms and fee schedule','Apply yourself on the issuer’s website','Move normal recurring charges to the new card','Do not buy anything only to meet the requirement'], done:[0,1,2,3],
+      reqs:[{ label:'Purchases on new card', cur:2380, target:4000, unit:'$' }], deadline:inDays(49), status:'Progress entered manually in this demo. Phase 2 reads it from synced card transactions.' },
+    { id:'idea-brightwater', stage:'guide', type:'Bank bonus', title:'Brightwater Bank — $300 checking bonus', value:300, valueText:'$300 cash', realizeAs:'income', account:'checking', projects:['bonuses','aicraft'], ai:'discovered',
+      summary:'$300 after $2,000 in direct deposits within 90 days. Monthly fee is waived with direct deposit.',
+      eval:{ Eligibility:'No Brightwater checking account in the past 24 months.', Requirements:'$2,000 total direct deposits within 90 days.', Fees:'$12/month unless you have a direct deposit that month.', Deadline:'Offer ends '+inDays(60)+'.', Credit:'Soft inquiry only.', Benefit:'$300, taxable as interest.' },
+      fit:{ level:'GOOD', why:['Your paychecks easily cover $2,000 in 90 days.','Splitting deposits doesn’t reduce Free to Spend.'] },
+      steps:['Confirm you have had no Brightwater checking account in 24 months','Open the account yourself (Purser and Hermes never apply for you)','Set a payroll split of $700 per paycheck to Brightwater','Add the account to Purser so deposits are tracked','Set a reminder to undo the split after the bonus posts'], done:[0],
+      reqs:[{ label:'Direct deposits within 90 days', cur:0, target:2000, unit:'$' }] },
+    { id:'idea-meridian-sav', stage:'evaluate', type:'Savings bonus', title:'Meridian Bank — $400 new-money savings bonus', value:400, valueText:'$400 cash', realizeAs:'income', account:'savings', projects:['bonuses'], ai:'discovered',
+      summary:'$400 for depositing $15,000 in new money and holding it for 90 days.',
+      eval:{ Eligibility:'New money only. Funds already at Meridian don’t count.', Requirements:'Deposit $15,000 and keep it there for 90 days.', Fees:'None.', Deadline:'Fund within 30 days of opening.', Credit:'Soft inquiry only.', Benefit:'$400, minus the interest your HYSA would have paid.' },
+      fitRule:'newMoney', newMoney:15000, holdDays:90,
+      steps:['Decide how much cash you can lock up for 90 days','Open the account yourself','Move the funds yourself','Track the hold period in Purser'], done:[],
+      reqs:[{ label:'New money deposited', cur:0, target:15000, unit:'$' },{ label:'Days held', cur:0, target:90, unit:'d' }] },
+    { id:'idea-bundle', stage:'evaluate', type:'Insurance savings', title:'Renters + auto bundle re-quote', value:132, valueText:'Est. $8–14 / month', realizeAs:'saving', baselineWas:121, projects:['aicraft'], ai:'researched',
+      summary:'Beacon offers a multi-policy discount if you move your renters policy to them. Estimate from published rates, not a quote.',
+      eval:{ Eligibility:'Requires an active Beacon auto policy. You have one.', Requirements:'Move renters coverage to Beacon at renewal.', Fees:'None. Check for a cancellation fee on the current renters policy.', Deadline:'Renters policy renews in about 6 weeks.', Credit:'Insurers may use a credit-based score. No hard inquiry.', Benefit:'Est. $8–14/month off auto. Counted in Save only after the cheaper bill is actually paid.' },
+      fit:{ level:'GOOD', why:['No upfront cost.','Coverage stays the same.'] },
+      steps:['Pull your current renters declarations page','Request a bundled quote yourself','Compare coverage line by line','Switch at renewal if the numbers hold'], done:[],
+      reqs:[{ label:'Cheaper premiums paid', cur:0, target:1, unit:'×' }] },
+    { id:'idea-monitors', stage:'discover', type:'Resale', title:'Unused studio monitors (pair)', value:160, valueText:'Est. $140–180 net', realizeAs:'resale', projects:['resale','aicraft'], ai:'discovered',
+      summary:'Listed in your asset register and unused for over a year. Recent sales of the same model suggest $170–210 before fees.',
+      eval:{ Eligibility:'Personal item you own outright.', Requirements:'Photos, listing, packing or local pickup.', Fees:'~13% marketplace fee, or $0 local cash sale.', Deadline:'None.', Credit:'None.', Benefit:'Est. $140–180 net proceeds. Original cost $398, so a realized loss vs. cost.' },
+      fit:{ level:'GOOD', why:['Item is idle.','Local sale avoids fees and shipping.'] },
+      steps:['Check the monitors work','Photograph them and draft a listing','Post the listing yourself','Record the sale in Purser'], done:[],
+      reqs:[{ label:'Item sold', cur:0, target:1, unit:'×' }] },
+    { id:'idea-cloud', stage:'discover', type:'Subscription reduction', title:'Duplicate cloud storage', value:35.88, valueText:'$2.99 / month', realizeAs:'saving', baselineWas:2.99, projects:['aicraft'], ai:'organized',
+      summary:'Cloudbox 200 GB overlaps storage already included with another plan you pay for.',
+      eval:{ Eligibility:'You own the subscription.', Requirements:'Move files, then cancel.', Fees:'None.', Deadline:'Renews on the 3rd.', Credit:'None.', Benefit:'$2.99/month once cancelled.' },
+      fit:{ level:'GOOD', why:['Small but permanent.'] },
+      steps:['Confirm what is stored in Cloudbox','Move the files','Cancel the plan yourself'], done:[],
+      reqs:[{ label:'Cancelled and first month skipped', cur:0, target:1, unit:'×' }] },
+    { id:'idea-q4', stage:'discover', type:'Cashback', title:'Meridian Q4 5% category activation', value:75, valueText:'Up to $75 this quarter', realizeAs:'income', account:'meridian', projects:['bonuses'], ai:'discovered',
+      summary:'Meridian pays 5% on groceries this quarter after activation, up to $1,500 in purchases.',
+      eval:{ Eligibility:'Meridian Cash Card holders.', Requirements:'Activate, then use the card for groceries.', Fees:'None.', Deadline:'Activate by quarter end.', Credit:'None.', Benefit:'5% on up to $1,500 = $75 max. Lower Corvus cashback on those purchases.' },
+      fit:{ level:'PARTIAL', why:['Your grocery spend runs about $450/month, so roughly $67 is reachable.','You lose 1.5% Corvus cashback on those purchases.'] },
+      steps:['Activate the category yourself in the Meridian app','Use the Meridian card for groceries this quarter'], done:[],
+      reqs:[{ label:'Grocery purchases on Meridian', cur:0, target:1500, unit:'$' }] },
+  ];
+}
+
+/* ── CALCULATIONS ───────────────────────────────────────────────────── */
+const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const MON = MONTHS.map(m => m.slice(0,3));
+const Calc = {
+  range(ui, data){
+    const T = data.today, t = U.parse(T), start0 = data.trackingStart;
+    if (ui.period === 'month'){
+      const s = new Date(t.getFullYear(), t.getMonth()+(ui.monthOffset||0), 1), e = new Date(s.getFullYear(), s.getMonth()+1, 0);
+      const end = U.iso(e) > T ? T : U.iso(e);
+      return { kind:'month', start:U.iso(s), end, label:MONTHS[s.getMonth()]+' '+s.getFullYear(), short:MON[s.getMonth()]+(end === T ? ' MTD' : ''), partial:end === T, canPrev:U.iso(s) > start0, canNext:(ui.monthOffset||0) < 0 };
+    }
+    if (ui.period === 'year'){
+      const y = t.getFullYear()+(ui.yearOffset||0); let start = y+'-01-01'; if (start < start0) start = start0;
+      const end = y+'-12-31' > T ? T : y+'-12-31';
+      return { kind:'year', start, end, label:String(y)+(end === T ? ' · YEAR TO DATE' : ''), short:y+(end === T ? ' YTD' : ''), partial:end === T, canPrev:y > U.parse(start0).getFullYear(), canNext:(ui.yearOffset||0) < 0 };
+    }
+    const s = U.parse(start0);
+    return { kind:'lifetime', start:start0, end:T, label:'SINCE '+MONTHS[s.getMonth()]+' '+s.getFullYear(), short:'LIFETIME', partial:true, canPrev:false, canNext:false };
+  },
+  // Spend / Earn / Save / Net. Transfers, adjustments and review items never count.
+  metrics(data, rg, opt){
+    opt = opt || {};
+    let spend = 0, earn = 0, save = 0; const pend = { spend:0, earn:0 }; let n = 0;
+    for (const t of data.tx){
+      if (t.date < rg.start || t.date > rg.end) continue;
+      if (opt.project && !t.projects.includes(opt.project)) continue;
+      let e = 0, s = 0, v = 0;
+      if (t.kind === 'income') e = t.amount; else if (t.kind === 'expense') s = t.amount; else if (t.kind === 'refund') s = -t.amount; else if (t.kind === 'saving') v = t.amount; else continue;
+      if (t.status === 'pending'){ pend.earn += e; pend.spend += s; if (!opt.includePending) continue; }
+      earn += e; spend += s; save += v; n++;
+    }
+    spend = U.r2(spend); earn = U.r2(earn); save = U.r2(save);
+    return { spend, earn, save, net:U.r2(earn + save - spend), cashflow:U.r2(earn - spend), pend:{ spend:U.r2(pend.spend), earn:U.r2(pend.earn) }, pendIncluded:!!opt.includePending, n };
+  },
+  series(data, endOff, n, opt){
+    const out = [];
+    for (let k = endOff-n+1; k <= endOff; k++){
+      const rg = Calc.range({ period:'month', monthOffset:k }, data);
+      if (rg.end < data.trackingStart){ out.push(null); continue; }
+      const m = Calc.metrics(data, rg, { includePending:!!opt.includePending && k === 0, project:opt.project });
+      out.push(Object.assign(m, { off:k, rg, mon:MON[U.parse(rg.start).getMonth()], yr:rg.start.slice(2,4) }));
+    }
+    return out;
+  },
+  balances(data){ const b = {}; for (const a of data.accounts) b[a.id] = a.ledger ? Ledger.balance(data, a.id) : a.value; return b; },
+  history(data, a){
+    if (!a.ledger) return a.history.map((v,i) => ({ v, off:i-11 }));
+    const t = U.parse(data.today), out = [];
+    for (let k=-11; k<=0; k++){
+      const e = new Date(t.getFullYear(), t.getMonth()+k+1, 0); const asOf = k === 0 ? data.today : U.iso(e);
+      out.push({ off:k, v: asOf < data.trackingStart ? null : Ledger.balance(data, a.id, asOf) });
+    }
+    return out;
+  },
+  cardNet(data, card, monthKey){
+    return U.r2(U.sum(data.tx.filter(t => t.status === 'posted' && t.accountId === card && t.date.slice(0,7) === monthKey), t => t.kind === 'expense' ? t.amount : (t.kind === 'refund' || t.kind === 'income') ? -t.amount : 0));
+  },
+  obligations(data, days){
+    const T = data.today, tD = U.parse(T), end = U.iso(U.addDays(tD, days)), out = [];
+    for (const b of data.bills){
+      for (let m=0; m<3; m++){
+        const base = new Date(tD.getFullYear(), tD.getMonth()+m, 1), last = new Date(base.getFullYear(), base.getMonth()+1, 0).getDate();
+        const due = U.iso(new Date(base.getFullYear(), base.getMonth(), Math.min(b.day, last)));
+        if (due <= T || due > end) continue;
+        let amount = b.amount, est = false, note = b.note || '';
+        if (b.card){
+          const k = U.iso(new Date(base.getFullYear(), base.getMonth()-1, 1)).slice(0,7);
+          amount = Calc.cardNet(data, b.card, k); est = k === T.slice(0,7);
+          note = est ? 'Statement still open. Amount so far.' : 'Closed statement balance.';
+          if (amount <= 0.005) continue;
+        }
+        if (b.estimate){ const past = data.tx.filter(t => t.desc.startsWith(b.estimate) && t.status === 'posted').slice(-3); amount = U.sum(past, t => t.amount) / Math.max(1, past.length); est = true; note = 'Average of last 3 bills.'; }
+        const card = data.byId[b.from] && data.byId[b.from].type === 'credit';
+        out.push({ id:b.id+'-'+due, name:b.name, due, days:U.days(T, due), amount:U.r2(amount), from:b.from, reserve:!card, kind:b.kind, est, note:card ? 'Charged to card. Covered when that statement is paid, so not reserved twice.' : note });
+      }
+    }
+    return out.sort((a,b) => a.due < b.due ? -1 : a.due > b.due ? 1 : b.amount - a.amount);
+  },
+  allocation(data, bal, days){
+    let available = 0, restricted = 0; const avail = [], restr = [];
+    for (const a of data.accounts.filter(a => a.group === 'cash')){ if (a.restricted){ restricted += bal[a.id]; restr.push(a); } else { available += bal[a.id]; avail.push(a); } }
+    const inv = data.accounts.filter(a => a.group === 'invest'), invested = U.sum(inv, a => a.value);
+    const obl = Calc.obligations(data, days), resItems = obl.filter(o => o.reserve), need = U.sum(resItems, o => o.amount);
+    const reserved = Math.min(need, Math.max(0, available));
+    return { available:U.r2(available), restricted:U.r2(restricted), invested:U.r2(invested), reserved:U.r2(reserved), free:U.r2(available - reserved), shortfall:U.r2(need - reserved), avail, restr, inv, obl, resItems };
+  },
+  credit(data, bal){
+    const cards = data.accounts.filter(a => a.type === 'credit').map(a => {
+      const owed = U.r2(-bal[a.id]), pending = U.r2(U.sum(data.tx.filter(t => t.accountId === a.id && t.status === 'pending' && t.kind === 'expense'), t => t.amount));
+      return { a, owed, pending, avail:U.r2(a.limit - owed), util:owed / a.limit };
+    });
+    const owed = U.sum(cards, c => c.owed), limit = U.sum(cards, c => c.a.limit);
+    return { cards, owed:U.r2(owed), limit, avail:U.r2(limit - owed), util:owed / limit, pending:U.r2(U.sum(cards, c => c.pending)) };
+  },
+  subscriptions(data){
+    const since = U.iso(U.addDays(U.parse(data.today), -40)), m = new Map();
+    for (const t of data.tx) if (t.sub === 'subscription' && t.kind === 'expense' && t.status === 'posted' && t.date >= since) m.set(t.desc, t);
+    const list = [...m.values()].sort((a,b) => b.amount - a.amount);
+    return { list, monthly:U.r2(U.sum(list, t => t.amount)) };
+  },
+  cashLedger(data){
+    const a = data.byId.cash; let b = a.opening; const rows = [];
+    const list = data.tx.filter(t => t.status === 'posted' && (t.accountId === 'cash' || t.counterAccountId === 'cash')).sort((x,y) => x.date < y.date ? -1 : x.date > y.date ? 1 : (x.recordedAt < y.recordedAt ? -1 : 1));
+    for (const t of list){ const e = Ledger.effect(t, 'cash'); b = U.r2(b + e); rows.push({ t, e, bal:b }); }
+    return rows.reverse();
+  },
+  reviews(data){ return data.tx.filter(t => t.match); },
+  loan(data, bal){
+    const a = data.byId.loan, balance = U.r2(-bal.loan), paid = U.r2(a.original - balance);
+    let b = balance, months = 0; const r = a.apr/100/12; while (b > 0.005 && months < 120){ b = b*(1+r) - a.payment; months++; }
+    const t = U.parse(data.today), payoff = new Date(t.getFullYear(), t.getMonth()+months, 22);
+    const interest = U.r2(U.sum(data.tx.filter(x => x.desc === 'AUTO LOAN — INTEREST PORTION'), x => x.amount));
+    return { a, balance, paid, pct:paid / a.original, months, payoff:U.iso(payoff), interest };
+  },
+  resale(data){
+    return data.resale.map(s => {
+      const pay = data.tx.find(t => t.id === s.payoutId);
+      const net = U.r2(s.gross - s.fees - s.ship);
+      return Object.assign({}, s, { status:pay ? pay.status : 'posted', payout:U.r2(s.gross - s.fees), net, pl:U.r2(net - s.cost) });
+    }).reverse();
+  },
+  project(data, pid, rg, includePending){
+    const m = Calc.metrics(data, rg, { includePending, project:pid });
+    const txs = data.tx.filter(t => t.projects.includes(pid) && t.date >= rg.start && t.date <= rg.end).slice().reverse();
+    const shared = txs.filter(t => t.projects.length > 1), withOthers = {};
+    for (const t of shared) for (const p of t.projects) if (p !== pid) withOthers[p] = (withOthers[p]||0) + 1;
+    return { m, txs, shared, withOthers };
+  },
+  insights(data, C){
+    const out = [], t = U.parse(data.today), dim = new Date(t.getFullYear(), t.getMonth()+1, 0).getDate(), dom = t.getDate();
+    const fixed = new Set(['Housing','Insurance','Utilities','Loan interest','Phone']);
+    const disc = rg => U.sum(data.tx.filter(x => x.status === 'posted' && x.date >= rg.start && x.date <= rg.end && (x.kind === 'expense' || x.kind === 'refund') && !fixed.has(x.category) && x.category !== 'AI hardware'), x => x.kind === 'refund' ? -x.amount : x.amount);
+    const cur = disc(Calc.range({ period:'month', monthOffset:0 }, data));
+    const prev = []; for (let k=1; k<=6; k++){ const rg = Calc.range({ period:'month', monthOffset:-k }, data); if (rg.start >= data.trackingStart) prev.push(disc(rg)); }
+    const avg = U.sum(prev) / Math.max(1, prev.length), pace = cur / dom * dim;
+    out.push({ c: pace > avg*1.08 ? 'tangerine' : 'sky', t:'DISCRETIONARY SPEND PACE', x:`${F0(cur)} so far this month, on pace for about ${F0(pace)}. Your 6-month average is ${F0(avg)}. Excludes rent, insurance, utilities, phone, loan interest and one-off hardware.` });
+    const soon = C.alloc.obl.filter(o => o.days <= 10);
+    if (soon.length) out.push({ c:'peach', t:'NEXT 10 DAYS', x:`${soon.length} obligations totaling ${F0(U.sum(soon, o => o.amount))}. Largest: ${soon.slice().sort((a,b) => b.amount - a.amount)[0].name}, ${F0(soon.slice().sort((a,b) => b.amount - a.amount)[0].amount)}.` });
+    out.push({ c: C.credit.util < .1 ? 'sky' : C.credit.util < .3 ? 'gold' : 'rose', t:'CREDIT UTILIZATION', x:`${(C.credit.util*100).toFixed(1)}% across both cards. ${C.credit.util < .1 ? 'Under 10%, the range scoring models treat most favorably.' : C.credit.util < .3 ? 'Under 30%. Paying before statements close would lower the reported figure.' : 'Above 30%. Reported utilization at this level can weigh on scores.'}` });
+    const open = data.tx.filter(x => x.kind === 'review' && !x.reviewed);
+    if (open.length) out.push({ c:'alert', t:'CASH MATCHES WAITING', x:`${open.length} bank ${open.length === 1 ? 'item looks' : 'items look'} like cash movement. Until you confirm, Cash on Hand may be off by up to ${F0(U.sum(open, x => x.amount))}.` });
+    return out;
+  },
+  ideaFit(data, idea, C){
+    if (idea.fit) return idea.fit;
+    if (idea.fitRule === 'newMoney'){
+      const interest = idea.newMoney * 0.04 * idea.holdDays / 365, net = idea.value - interest;
+      if (C.alloc.free < idea.newMoney) return { level:'POOR', why:[`Needs ${F0(idea.newMoney)} of new money for ${idea.holdDays} days. Your Free to Spend is ${F0(C.alloc.free)}.`, `Moving that much would leave no cushion above your reserve.`, `Even if funded, your HYSA would have paid about ${F0(interest)} on the same money, so the real gain is ${F0(net)}.`] };
+      return { level:'PARTIAL', why:[`Possible: Free to Spend is ${F0(C.alloc.free)}.`, `Your HYSA would earn about ${F0(interest)} on the same money, so the real gain is ${F0(net)}.`] };
+    }
+    if (idea.fitRule === 'cardSpend'){
+      const months = []; for (let k=1; k<=6; k++){ const rg = Calc.range({ period:'month', monthOffset:-k }, data); months.push(U.sum(data.tx.filter(t => t.status === 'posted' && t.kind === 'expense' && (t.accountId === 'corvus' || t.accountId === 'meridian') && t.date >= rg.start && t.date <= rg.end && t.category !== 'AI hardware'), t => t.amount)); }
+      const avg = U.sum(months)/months.length, three = avg*3;
+      return { level: three >= idea.spendTarget ? 'GOOD' : 'PARTIAL', why:[`Your normal card spending averages ${F0(avg)}/month, about ${F0(three)} over 90 days.`, three >= idea.spendTarget ? 'Moving existing charges to the new card meets the requirement without extra purchases.' : 'You would need to shift more spending than usual. Do not buy things only to qualify.', 'Hard inquiry and a $95 annual fee.'] };
+    }
+    return { level:'UNKNOWN', why:['Not evaluated yet.'] };
+  },
+};
+function F0(n){ return (n < 0 ? '−' : '') + '$' + Math.round(Math.abs(n)).toLocaleString('en-US'); }
+</script>
+
+<script id="ui">
+"use strict";
+/* ═══ UI ════════════════════════════════════════════════════════════════ */
+const $ = (s, r) => (r || document).querySelector(s);
+const h = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const F = {
+  usd(n, o){ o = o || {}; const cents = o.cents !== false, neg = n < -0.0049, a = Math.abs(n); return (neg ? '−' : (o.sign && n > 0.0049 ? '+' : '')) + '$' + a.toLocaleString('en-US', { minimumFractionDigits:cents ? 2 : 0, maximumFractionDigits:cents ? 2 : 0 }); },
+  big(n){ const neg = n < -0.0049, c = Math.round(Math.abs(n)*100); return `<span class="w">${neg ? '−' : ''}$${Math.floor(c/100).toLocaleString('en-US')}</span><span class="c">.${String(c%100).padStart(2,'0')}</span>`; },
+  k(n){ const a = Math.abs(n); const s = a >= 1000 ? (a/1000).toFixed(a % 1000 === 0 ? 0 : 1) + 'k' : String(Math.round(a)); return (n < 0 ? '−' : '') + '$' + s; },
+  d(s){ const x = U.parse(s); return MON[x.getMonth()] + ' ' + x.getDate(); },
+  dy(s){ const x = U.parse(s); return MON[x.getMonth()] + ' ' + x.getDate() + ', ' + x.getFullYear(); },
+};
+
+/* ── SKINS ──────────────────────────────────────────────────────────────
+   A skin = tokens + fonts + motion + a frame renderer. Views never hard-code
+   colors; they reference semantic tokens (--spend, --earn, --save, --net).  */
+const SKINS = {
+  lcars:{ name:'LCARS · TNG', status:'active', frame:'double-elbow', swatch:['#ff9c00','#ffcc99','#cc99cc','#9999cc','#99ccff','#cc6666'],
+    tokens:{ gold:'#ff9c00', peach:'#ffcc99', tangerine:'#ff9966', lavender:'#cc99cc', violet:'#9977aa', lilac:'#9999cc', sky:'#99ccff', rose:'#cc6666' },
+    motion:{ expandMs:760, collapseMs:560 }, note:'Starfleet console. Double-elbow frame, nav rail, segmented readouts.' },
+  minimal:{ name:'Minimal Modern', status:'future', swatch:['#f5f5f2','#e2e2dc','#1a1a1a','#3b6ef5','#22a06b','#d9534f'], note:'Quiet cards, system font, light and dark.' },
+  crt:{ name:'Monochrome CRT', status:'future', swatch:['#000000','#0a2a12','#145c28','#1f8f3f','#33ff66','#b6ffc8'], note:'Phosphor green terminal with scanlines.' },
+  synth:{ name:'Retro Synthwave', status:'future', swatch:['#14002b','#3d0a6b','#ff2bd6','#2de2e6','#f9c80e','#ff6c11'], note:'Neon grid, chrome type, sunset gradients.' },
+};
+function applySkin(id){ const s = SKINS[id], root = document.documentElement; for (const [k,v] of Object.entries(s.tokens || {})) root.style.setProperty('--'+k, v); root.dataset.skin = id; }
+
+/* ── STATE ──────────────────────────────────────────────────────────── */
+const PREF_KEY = 'purser.prefs.v1';
+const PREF_FIELDS = ['expanded','view','period','includePending','project','reserveDays','audio','reduceMotion','gambling','hidden','wpos'];
+function loadPrefs(){ try { const p = JSON.parse(localStorage.getItem(PREF_KEY) || 'null'); return p && typeof p === 'object' ? p : null; } catch(e){ return null; } }
+function savePrefs(){ try { const o = {}; for (const k of PREF_FIELDS) o[k] = S.ui[k]; localStorage.setItem(PREF_KEY, JSON.stringify(o)); } catch(e){} }
+const savedPrefs = loadPrefs();
+const S = {
+  provider: MockProvider,
+  data: null,
+  ui: Object.assign({ expanded:false, view:'overview', period:'month', monthOffset:0, yearOffset:0, includePending:false, project:'aicraft',
+    open:{ checking:true }, idea:'idea-halyard', ideaFilter:'all', reserveDays:30, audio:false, reduceMotion:false, gambling:true, hidden:{},
+    cashMode:'deposit', cashAmt:'', cashNote:'', cashTags:{}, armReset:false, recon:{}, wpos:null }, savedPrefs || {}),
+  seq: 0,
+};
+S.ui.monthOffset = 0; S.ui.yearOffset = 0;
+S.data = S.provider.load(new Date());
+
+/* ── ACTIONS (all state changes go through here) ───────────────────── */
+const newId = () => 'm' + String(++S.seq).padStart(4, '0');
+const nowISO = () => new Date().toISOString();
+function record(o){ const t = Object.assign({ status:'posted', source:'manual', projects:[], ai:null, category:'', sub:'', accountId:null, counterAccountId:null, date:S.data.today }, o); t.id = newId(); t.amount = U.r2(t.amount); t.recordedAt = nowISO(); S.data.tx.push(t); return t; }
+const VIEWS = [
+  { id:'overview', label:'Overview', c:'peach', code:'01' },
+  { id:'accounts', label:'Accounts', c:'lavender', code:'02' },
+  { id:'projects', label:'Projects', c:'tangerine', code:'03' },
+  { id:'ideas', label:'Ideas', c:'sky', code:'04' },
+  { id:'settings', label:'Settings', c:'lilac', code:'05' },
+];
+const STAGES = [['discover','Discover','sky'],['evaluate','Evaluate','lilac'],['guide','Guide','lavender'],['track','Track','peach'],['reconcile','Reconcile','gold']];
+const stageIdx = s => STAGES.findIndex(x => x[0] === s);
+
+const A = {
+  collapse(){ Shell.collapse(); return false; },
+  view(el){ S.ui.view = el.dataset.id; },
+  goto(el){ S.ui.view = el.dataset.id; if (el.dataset.open) S.ui.open[el.dataset.open] = true; },
+  period(el){ S.ui.period = el.dataset.id; S.ui.monthOffset = 0; S.ui.yearOffset = 0; },
+  step(el){ const d = +el.dataset.id; if (S.ui.period === 'month') S.ui.monthOffset += d; else if (S.ui.period === 'year') S.ui.yearOffset += d; },
+  pending(){ S.ui.includePending = !S.ui.includePending; toast(S.ui.includePending ? 'Pending items included and marked' : 'Showing realized values only', 'gold'); },
+  pickMonth(el){ S.ui.period = 'month'; S.ui.monthOffset = +el.dataset.id; },
+  legend(el){ S.ui.hidden[el.dataset.id] = !S.ui.hidden[el.dataset.id]; },
+  acct(el){ S.ui.open[el.dataset.id] = !S.ui.open[el.dataset.id]; },
+  restrict(el){
+    const a = S.data.byId[el.dataset.id]; a.restricted = !a.restricted;
+    if (a.restricted && !a.restrictedNote) a.restrictedNote = 'Marked unavailable by you on ' + F.dy(S.data.today) + '.';
+    toast(a.name + (a.restricted ? ' marked restricted. Removed from Available Cash.' : ' released. Counted in Available Cash.'), 'violet');
+  },
+  project(el){ S.ui.project = el.dataset.id; },
+  cashMode(el){ S.ui.cashMode = el.dataset.id; },
+  key(el){
+    const k = el.dataset.id; let v = S.ui.cashAmt;
+    if (k === 'clr') v = ''; else if (k === 'del') v = v.slice(0, -1);
+    else if (k === '.') { if (!v.includes('.')) v = (v || '0') + '.'; }
+    else { const dec = v.split('.')[1]; if (dec && dec.length >= 2) return false; if (v.replace('.','').length >= 7) return false; v = v === '0' ? k : v + k; }
+    S.ui.cashAmt = v;
+  },
+  cashTag(el){ S.ui.cashTags[el.dataset.id] = !S.ui.cashTags[el.dataset.id]; },
+  cashExec(){
+    const amt = parseFloat(S.ui.cashAmt), mode = S.ui.cashMode, cash = Ledger.balance(S.data, 'cash');
+    const chk = cashCheck(mode, amt, cash); if (chk) { toast(chk, 'alert'); return; }
+    const note = S.ui.cashNote.trim(), projects = Object.keys(S.ui.cashTags).filter(k => S.ui.cashTags[k]);
+    let msg = '';
+    if (mode === 'set'){
+      const diff = U.r2(amt - cash); if (Math.abs(diff) < 0.005){ toast('Count matches the ledger. No adjustment needed.', 'sky'); S.ui.cashAmt = ''; return; }
+      record({ kind:'adjustment', dir:diff > 0 ? 1 : -1, amount:Math.abs(diff), accountId:'cash', desc:'CASH COUNT RECONCILIATION' + (note ? ' — ' + note.toUpperCase() : ''), category:'Reconciliation', counted:amt });
+      msg = `Cash reconciled to ${F.usd(amt)}. Adjustment ${F.usd(diff, { sign:true })} recorded, not counted as Spend or Earn`;
+    } else if (mode === 'in'){ record({ kind:'income', amount:amt, accountId:'cash', desc:(note || 'Cash income').toUpperCase(), category:'Cash income', projects }); msg = `Cash on Hand +${F.usd(amt)}. Earn +${F.usd(amt)}`; }
+    else if (mode === 'out'){ record({ kind:'expense', amount:amt, accountId:'cash', desc:(note || 'Cash purchase').toUpperCase(), category:'Cash purchases', projects }); msg = `Cash on Hand −${F.usd(amt)}. Spend +${F.usd(amt)}`; }
+    else if (mode === 'atm'){ record({ kind:'transfer', sub:'atm', amount:amt, accountId:'checking', counterAccountId:'cash', desc:'ATM WITHDRAWAL (MANUAL)' + (note ? ' — ' + note.toUpperCase() : ''), category:'Transfer', awaitingBank:true }); msg = `Transfer: Checking −${F.usd(amt)}, Cash +${F.usd(amt)}. Total money unchanged`; }
+    else if (mode === 'deposit'){ record({ kind:'transfer', sub:'cash_deposit', amount:amt, accountId:'cash', counterAccountId:'checking', desc:'CASH DEPOSIT TO CHECKING (MANUAL)' + (note ? ' — ' + note.toUpperCase() : ''), category:'Transfer', awaitingBank:true }); msg = `Transfer: Cash −${F.usd(amt)}, Checking +${F.usd(amt)}. Total money unchanged`; }
+    S.ui.cashAmt = ''; S.ui.cashNote = ''; S.ui.cashTags = {};
+    toast(msg, 'peach');
+  },
+  match(el){
+    const t = S.data.tx.find(x => x.id === el.dataset.id), ok = el.dataset.v === 'yes';
+    if (!ok){ t.reviewed = 'rejected'; t.reviewedAt = nowISO(); toast('Marked as not cash. It stays in Checking and moves to the categorization queue.', 'lilac'); return; }
+    if (t.match.suggest === 'deposit'){
+      const cash = Ledger.balance(S.data, 'cash');
+      if (cash < t.amount){ toast(`Cash on Hand is ${F.usd(cash)}, less than this ${F.usd(t.amount)} deposit. Reconcile your cash count first.`, 'alert'); return; }
+      Object.assign(t, { kind:'transfer', sub:'cash_deposit', accountId:'cash', counterAccountId:'checking' });
+      toast(`Matched. Cash −${F.usd(t.amount)}. Checking already showed +${F.usd(t.amount)}. Total unchanged`, 'peach');
+    } else {
+      Object.assign(t, { kind:'transfer', sub:'atm', accountId:'checking', counterAccountId:'cash' });
+      toast(`Matched. Checking already showed −${F.usd(t.amount)}. Cash +${F.usd(t.amount)}. Total unchanged`, 'peach');
+    }
+    t.reviewed = 'confirmed'; t.reviewedAt = nowISO(); delete t.dir;
+  },
+  idea(el){ S.ui.idea = el.dataset.id; },
+  ideaFilter(el){ S.ui.ideaFilter = el.dataset.id; },
+  ideaAdvance(el){
+    const o = idea(el.dataset.id), i = stageIdx(o.stage);
+    if (o.stage === 'guide' && o.done.length < o.steps.length) return false;
+    if (o.stage === 'track' && !o.reqs.every(r => r.cur >= r.target)) return false;
+    o.stage = STAGES[i+1][0]; toast(`${o.title.split(' — ')[0]} moved to ${STAGES[i+1][1]}`, STAGES[i+1][2]);
+  },
+  ideaPass(el){ const o = idea(el.dataset.id); o.prevStage = o.stage; o.stage = 'passed'; toast('Opportunity set aside. Nothing was counted.', 'lilac'); },
+  ideaRestore(el){ const o = idea(el.dataset.id); o.stage = o.prevStage || 'discover'; },
+  ideaStep(el){ const o = idea(el.dataset.id), k = +el.dataset.k; o.done = o.done.includes(k) ? o.done.filter(x => x !== k) : o.done.concat(k); },
+  ideaSim(el){ const o = idea(el.dataset.id); for (const r of o.reqs){ if (r.cur < r.target){ r.cur = Math.min(r.target, r.cur + (r.unit === '$' ? Math.ceil(r.target/4) : r.unit === 'd' ? 30 : 1)); break; } } toast('Demo: tracking progress advanced. Phase 2 reads this from synced transactions.', 'peach'); },
+  ideaRecord(el){
+    const o = idea(el.dataset.id), rv = S.ui.recon[o.id] || {}, amt = parseFloat(rv.amt != null ? rv.amt : defaultRealize(o));
+    if (!(amt > 0)){ toast('Enter the amount that actually posted.', 'alert'); return false; }
+    let t;
+    if (o.pendingTxn){ t = S.data.tx.find(x => x.id === o.pendingTxn); Object.assign(t, { status:'posted', amount:U.r2(amt), date:S.data.today, recordedAt:nowISO(), source:'manual' }); }
+    else if (o.realizeAs === 'saving') t = record({ kind:'saving', amount:amt, desc:o.title + ' — first cheaper bill paid', category:o.type, projects:o.projects, ai:o.ai, ideaId:o.id, baseline:{ label:o.title, was:o.baselineWas, now:U.r2(o.baselineWas - amt) } });
+    else t = record({ kind:'income', sub:o.realizeAs === 'resale' ? 'resale' : 'bonus', amount:amt, accountId:rv.acct || o.account || 'checking', desc:o.title.toUpperCase() + ' — POSTED', category:o.realizeAs === 'resale' ? 'Resale' : 'Bonuses', projects:o.projects, ai:o.ai, ideaId:o.id });
+    o.stage = 'done'; o.realized = { id:t.id, amount:t.amount, date:t.date, kind:t.kind };
+    toast(`${F.usd(amt)} recorded as realized ${o.realizeAs === 'saving' ? 'Save' : 'Earn'}. ${o.pendingTxn ? 'Pending item converted, not added twice.' : ''}`, 'gold');
+  },
+  reserve(el){ S.ui.reserveDays = +el.dataset.id; },
+  toggle(el){ const k = el.dataset.id; S.ui[k] = !S.ui[k]; if (k === 'reduceMotion') document.documentElement.classList.toggle('reduce', S.ui.reduceMotion); if (k === 'audio' && S.ui.audio) beep(1500, .06); if (k === 'gambling' && !S.ui.gambling && S.ui.project === 'gambling') S.ui.project = 'aicraft'; },
+  reset(){
+    if (!S.ui.armReset){ S.ui.armReset = true; setTimeout(() => { if (S.ui.armReset){ S.ui.armReset = false; render(); } }, 5000); return; }
+    S.ui.armReset = false; S.data = S.provider.load(new Date()); S.ui.recon = {}; S.ui.cashAmt = ''; S.ui.idea = 'idea-halyard'; prevVals = {};
+    toast('Demo data restored to its starting state.', 'gold');
+  },
+};
+const idea = id => S.data.ideas.find(o => o.id === id);
+function defaultRealize(o){ return o.realizeAs === 'saving' ? (o.id === 'idea-bundle' ? 11 : o.baselineWas) : o.value; }
+function cashCheck(mode, amt, cash){
+  if (!(amt > 0) && !(mode === 'set' && amt === 0)) return 'Enter an amount with the keypad or keyboard.';
+  if ((mode === 'out' || mode === 'deposit') && amt > cash + 0.001) return `Cash on Hand is ${F.usd(cash)}. Use Set Balance if your count is different.`;
+  if (mode === 'atm' && amt > Ledger.balance(S.data, 'checking')) return 'That is more than the Checking balance.';
+  return '';
+}
+
+/* ── RENDER ─────────────────────────────────────────────────────────── */
+let CTX = null, lastView = null, prevVals = {};
+function compute(){
+  const d = S.data, u = S.ui, rg = Calc.range(u, d), pendOn = u.includePending && u.period !== 'lifetime';
+  const bal = Calc.balances(d), m = Calc.metrics(d, rg, { includePending:pendOn });
+  const alloc = Calc.allocation(d, bal, u.reserveDays), credit = Calc.credit(d, bal);
+  return { rg, pendOn, bal, m, alloc, credit };
+}
+function render(){
+  const C = CTX = compute();
+  renderWidget(C);
+  if (!S.ui.expanded) return;
+  const main = $('#main'), st = main && lastView === S.ui.view ? main.scrollTop : 0;
+  const enter = lastView !== null && lastView !== S.ui.view;
+  const fa = document.activeElement, fk = fa && fa.dataset && fa.dataset.act ? [fa.dataset.act, fa.dataset.id] : null;
+  $('#console').innerHTML = headerHTML(C) + mainHTML(C, enter);
+  const m2 = $('#main'); if (m2) m2.scrollTop = st;
+  lastView = S.ui.view;
+  if (fk){ const el = document.querySelector(`[data-act="${fk[0]}"]${fk[1] != null ? `[data-id="${CSS.escape(fk[1])}"]` : ''}`); if (el) el.focus({ preventScroll:true }); }
+  scrambleChanged(false);
+}
+
+/* Numbers resolve like a computer readout when they change */
+function scrambleChanged(force){
+  document.querySelectorAll('#console [data-key]').forEach(el => {
+    const k = el.dataset.key, v = el.dataset.v;
+    if (force || (prevVals[k] !== undefined && prevVals[k] !== v)) scramble(el);
+    prevVals[k] = v;
+  });
+}
+function scramble(el){
+  if (S.ui.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const nodes = []; const walk = n => { for (const c of n.childNodes){ if (c.nodeType === 3) nodes.push([c, c.nodeValue]); else walk(c); } }; walk(el);
+  const total = U.sum(nodes, n => n[1].length), t0 = performance.now(), dur = 520;
+  const tick = now => {
+    const p = Math.min(1, (now - t0) / dur); let idx = 0;
+    for (const [node, fin] of nodes){ let s = ''; for (const ch of fin){ s += (/\d/.test(ch) && idx/total > p) ? String((Math.random()*10)|0) : ch; idx++; } node.nodeValue = s; }
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+/* ── Components ── */
+function modHead(t, c, code){ return `<div class="mh" style="--c:var(--${c})"><span class="mh-cap"></span><h2 class="mh-t" style="margin:0">${h(t)}</h2><span class="mh-line"></span>${code ? `<span class="mh-code">${h(code)}</span>` : ''}</div>`; }
+const AI_C = { discovered:'sky', researched:'lilac', organized:'lavender', assisted:'peach', executed:'gold' };
+const KIND = { income:['EARN','earn'], expense:['SPEND','spend'], refund:['REFUND','spend'], saving:['SAVE','save'], transfer:['TRANSFER','lilac'], adjustment:['ADJUSTMENT','violet'], review:['NEEDS REVIEW','alert'] };
+function txRow(t, o){
+  o = o || {};
+  const k = KIND[t.kind] || ['—','ink-3'], c = t.kind === 'transfer' || t.kind === 'adjustment' ? 'ink-3' : k[1];
+  let sign = '', amt = t.amount;
+  if (o.acct){ const e = Ledger.effect(t, o.acct); sign = e > 0 ? '+' : e < 0 ? '−' : ''; }
+  else sign = t.kind === 'income' || t.kind === 'refund' ? '+' : t.kind === 'expense' ? '−' : t.kind === 'saving' ? '◇ ' : t.kind === 'transfer' ? '⇄ ' : (t.dir > 0 ? '+' : '−');
+  const acctName = id => id ? (S.data.byId[id] ? S.data.byId[id].name : id) : '';
+  const sub = t.kind === 'transfer' ? `${acctName(t.accountId)} → ${acctName(t.counterAccountId)}` : t.kind === 'saving' && t.baseline ? `Baseline ${F.usd(t.baseline.was)} → now ${F.usd(t.baseline.now)}` : [acctName(t.accountId), t.category].filter(Boolean).join(' · ');
+  const tags = [];
+  tags.push(`<span class="tag o" style="--c:var(--${c === 'ink-3' ? 'lilac' : c})">${k[0]}</span>`);
+  if (t.status === 'pending') tags.push(`<span class="tag p" style="--c:var(--gold)">PENDING</span>`);
+  if (o.showProjects !== false) for (const p of t.projects){ if (p === o.project) continue; const P = S.data.projects.find(x => x.id === p); if (P) tags.push(`<span class="tag" style="--c:var(--${P.c})">${h(P.name)}</span>`); }
+  if (t.ai) tags.push(`<span class="tag o" style="--c:var(--${AI_C[t.ai]})">AI · ${t.ai}</span>`);
+  if (t.source === 'manual') tags.push(`<span class="tag o" style="--c:var(--peach)">MANUAL</span>`);
+  if (t.refundOf) tags.push(`<span class="tag o" style="--c:var(--sky)">REVERSES ${h(t.refundOf)}</span>`);
+  return `<div class="lrow" style="--c:var(--${c})"><span class="d">${F.d(t.date)}</span><span class="ds">${h(t.desc)}<small>${h(sub)}</small></span><span class="amt">${sign}${F.usd(amt).replace('−','')}${o.bal != null ? `<small>BAL ${F.usd(o.bal)}</small>` : ''}</span>${tags.length ? `<span class="tags">${tags.join('')}</span>` : ''}</div>`;
+}
+function segMeter(p, c, marks, n){
+  n = n || 25; const on = Math.round(Math.max(0, Math.min(1, p)) * n); let s = '';
+  for (let i=0; i<n; i++) s += `<i class="${i < on ? 'on' : ''}"></i>`;
+  const mk = (marks || []).map(m => `<span class="mk" style="left:calc(${m*100}% - 1px)"><span>${Math.round(m*100)}%</span></span>`).join('');
+  return `<div class="segm${mk ? ' hasmk' : ''}" style="--c:var(--${c})" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p*100)}">${s}${mk}</div>`;
+}
+function metricsHTML(m, C, prefix, code){
+  const lifetime = C.rg.kind === 'lifetime';
+  const pendTxt = (k, c) => {
+    if (m.pendIncluded && m.pend[k]) return `${F.usd(m[k] - m.pend[k])} realized <span class="pend" style="--c:var(--${c})">+${F.usd(m.pend[k])} PENDING</span>`;
+    if (!lifetime && m.pend[k]) return `Realized. ${F.usd(m.pend[k])} pending not shown.`;
+    return lifetime ? 'Realized only' : 'Realized';
+  };
+  const cell = (k, label, c, sub, extra) => `<div class="metric${extra || ''}" style="--c:var(--${c})"><div class="metric-tab"><span>${label}</span><small>${h(code)}</small></div><div class="metric-val" data-key="${prefix}-${k}" data-v="${m[k]}">${F.big(m[k])}</div><div class="metric-sub">${sub}</div></div>`;
+  return `<div class="metrics">
+    ${cell('spend','SPEND','spend', pendTxt('spend','spend'))}
+    ${cell('earn','EARN','earn', pendTxt('earn','earn'))}
+    ${cell('save','SAVE','save', 'Verified against documented baselines')}
+    ${cell('net','NET', m.net < 0 ? 'neg' : 'net', `EARN + SAVE − SPEND${m.pendIncluded && (m.pend.earn || m.pend.spend) ? ' · <span class="pend" style="--c:var(--gold)">INCL. PENDING</span>' : ''}`)}
+  </div>`;
+}
+
+/* ── Header + frame ── */
+function stardate(){ const t = new Date(), s = new Date(t.getFullYear(), 0, 0), doy = Math.floor((t - s) / 86400000); return String(t.getFullYear()).slice(2) + String(doy).padStart(3, '0') + '.' + Math.floor((t.getHours()*60 + t.getMinutes()) / 144); }
+function headerHTML(C){
+  const u = S.ui, rg = C.rg, canPend = u.period !== 'lifetime';
+  const per = [['month','Month'],['year','Year'],['lifetime','Lifetime']].map((p,i) => `<button class="lb ${i === 0 ? 'rl' : ''} ${i === 2 ? 'rr' : ''} ${u.period === p[0] ? 'on' : ''}" data-act="period" data-id="${p[0]}" aria-pressed="${u.period === p[0]}">${p[1]}</button>`).join('');
+  const nTx = S.data.tx.length;
+  return `<header class="hf">
+    <div class="hf-rail"><div class="blk" style="--c:var(--peach);--i:0">LCARS ${stardate()}</div><div class="blk elbow" style="--c:var(--gold);--i:1">PURSER 0.1</div></div>
+    <div class="hf-fill" style="--c:var(--gold)"></div>
+    <div class="hf-body">
+      <div class="hdr-ctl" style="--i:0">
+        <div class="ctl-row">
+          <span class="ctl-lbl">PERIOD</span>
+          <div class="grp" role="group" aria-label="Period">${per}</div>
+          ${rg.kind !== 'lifetime' ? `<div class="stepper"><button class="lb rl" data-act="step" data-id="-1" ${rg.canPrev ? '' : 'disabled'} aria-label="Previous ${rg.kind}">◂</button><span class="step-lbl">${h(rg.label)}</span><button class="lb rr" data-act="step" data-id="1" ${rg.canNext ? '' : 'disabled'} aria-label="Next ${rg.kind}">▸</button></div>` : `<span class="step-lbl">${h(rg.label)}</span>`}
+        </div>
+        <div class="ctl-row">
+          <button class="lb round wide ${u.includePending && canPend ? 'on hatch' : ''}" data-act="pending" ${canPend ? '' : 'disabled'} aria-pressed="${u.includePending && canPend}">${canPend ? 'Include pending · ' + (u.includePending ? 'On' : 'Off') : 'Lifetime is realized only'}</button>
+          <span class="chip demo"><span class="dot"></span>Demonstration data</span>
+          <span class="chip" style="--c:var(--lilac)">Hermes · offline</span>
+        </div>
+      </div>
+      <div class="hdr-id" style="--i:1">
+        <h1 class="title">PURSER</h1>
+        <div class="subtitle">PERSONAL FINANCE COMMAND CENTER</div>
+        <button class="lb round collapse" data-act="collapse" title="Esc">Collapse to widget</button>
+      </div>
+    </div>
+    <div class="hf-bar">
+      <div class="seg" style="--c:var(--gold);flex:4;--i:0"></div>
+      <span class="seg-t" style="--c:var(--gold);--i:1">${F.dy(rg.start)} — ${F.dy(rg.end)}</span>
+      <div class="seg" style="--c:var(--lavender);flex:1.2;--i:2"></div>
+      <span class="seg-t" style="--c:var(--sky);--i:3">${nTx} ledger records</span>
+      <div class="seg" style="--c:var(--sky);flex:.5;--i:4"></div>
+      <div class="seg cap" style="--c:var(--peach);--i:5"></div>
+    </div>
+  </header>`;
+}
+function mainHTML(C, enter){
+  const u = S.ui, v = VIEWS.find(x => x.id === u.view);
+  const open = S.data.tx.filter(t => t.kind === 'review' && !t.reviewed).length;
+  const counts = { overview:'', accounts:S.data.accounts.length, projects:S.data.projects.filter(p => p.id !== 'gambling' || u.gambling).length, ideas:S.data.ideas.filter(o => stageIdx(o.stage) >= 0).length, settings:'' };
+  const nav = VIEWS.map((x,i) => `<button class="blk navbtn ${u.view === x.id ? 'on' : ''}" style="--c:var(--${x.c});--i:${i+1}" data-act="view" data-id="${x.id}" aria-current="${u.view === x.id ? 'page' : 'false'}"><span class="code">${x.code}${counts[x.id] !== '' ? '-' + String(counts[x.id]).padStart(2,'0') : ''}</span><kbd>${i+1}</kbd>${x.label}</button>`).join('');
+  const body = { overview:vOverview, accounts:vAccounts, projects:vProjects, ideas:vIdeas, settings:vSettings }[u.view](C);
+  return `<section class="mf">
+    <nav class="mf-rail" aria-label="Sections">
+      <div class="blk elbow" style="--c:var(--${v.c});--i:0">${v.code} · ${v.label}</div>
+      ${nav}
+      <div class="blk fill" style="--c:var(--gold);--i:6">${open ? open + ' to review' : 'Ledger clear'}</div>
+      <button class="blk navbtn" style="--c:var(--rose);--i:7" data-act="collapse" data-id="rail">Collapse</button>
+    </nav>
+    <div class="mf-fill" style="--c:var(--${v.c})"></div>
+    <div class="mf-bar">
+      <div class="seg" style="--c:var(--${v.c});flex:2.4;--i:0"></div>
+      <span class="seg-t" style="--c:var(--${v.c});--i:1">${v.label} · ${h(C.rg.short)}${C.pendOn ? ' · pending on' : ''}</span>
+      <div class="seg" style="--c:var(--violet);flex:.8;--i:2"></div>
+      <div class="seg" style="--c:var(--peach);flex:.3;--i:3"></div>
+      <span class="seg-t" style="--c:var(--alert);--i:4">Demo provider · not connected</span>
+      <div class="seg" style="--c:var(--lilac);flex:1;--i:5"></div>
+      <div class="seg cap" style="--c:var(--rose);--i:6"></div>
+    </div>
+    <main class="mf-body" id="main" tabindex="-1"><div class="view${enter ? ' enter' : ''}">${body}</div></main>
+  </section>`;
+}
+
+/* ── OVERVIEW ── */
+function vOverview(C){
+  const u = S.ui, d = S.data;
+  const endOff = Math.min(0, (u.period === 'month' ? u.monthOffset : 0) + 11);
+  const series = C.series = Calc.series(d, endOff, 12, { includePending:C.pendOn });
+  const subs = Calc.subscriptions(d), m = C.m;
+  return `<div class="grid">
+    <section class="s12" style="--i:0">${modHead('Primary readout', 'gold', C.rg.short)}${metricsHTML(m, C, 'ov', C.rg.short)}
+      <div class="netnote"><span><b>NET</b> is a performance score. SAVE is money you no longer have to spend, so it never shows up as cash.</span><span><b>CASH FLOW</b> (Earn − Spend) for the same period: <b class="num">${F.usd(m.cashflow)}</b></span></div>
+    </section>
+    <section class="s8" style="--i:1">${modHead('Resource allocation', 'sky', u.reserveDays + '-day reserve')}${allocHTML(C.alloc)}</section>
+    <section class="s4" style="--i:2">${modHead('Credit status', 'tangerine', '2 cards')}${creditHTML(C.credit)}</section>
+    <section class="s8" style="--i:3">${modHead('Spend · Earn · Save — 12 months', 'lilac', 'click a month')}${trendHTML(series, C)}</section>
+    <section class="s4" style="--i:4">${modHead('Analysis', 'lavender', 'local')}${Calc.insights(d, C).map(x => `<div class="ins" style="--c:var(--${x.c})"><b>${x.t}</b><p>${h(x.x)}</p></div>`).join('')}
+      <div class="note" style="--c:var(--lilac)">Computed in the app from your ledger. When Hermes connects (Phase 4) it reads summaries like these with read-only access.</div></section>
+    <section class="s6" style="--i:5">${modHead('Upcoming obligations', 'peach', 'next ' + u.reserveDays + ' days')}${obligHTML(C)}</section>
+    <section class="s3" style="--i:6">${modHead('Subscriptions', 'violet', F.usd(subs.monthly) + '/mo')}${subsHTML(subs)}</section>
+    <section class="s3" style="--i:7">${modHead('Cash on hand', 'peach', 'manual')}${cashMiniHTML(C)}</section>
+  </div>`;
+}
+function allocHTML(A){
+  const segs = [['free','Free to spend','sky',A.free],['reserved','Reserved','peach',A.reserved],['restricted','Restricted','violet',A.restricted,true],['invested','Invested','lavender',A.invested]].filter(s => s[3] > 0.005);
+  const total = U.sum(segs, s => s[3]), availPct = (A.free + A.reserved) / total * 100;
+  const names = list => list.map(a => a.name).join(', ');
+  return `<div class="eq">
+      <div class="eq-b" style="--c:var(--sky)"><span>AVAILABLE CASH</span><b data-key="al-av" data-v="${A.available}">${F.usd(A.available)}</b></div>
+      <div class="eq-op">−</div>
+      <div class="eq-b" style="--c:var(--peach)"><span>RESERVED</span><b data-key="al-rs" data-v="${A.reserved}">${F.usd(A.reserved)}</b></div>
+      <div class="eq-op">=</div>
+      <div class="eq-b big" style="--c:var(--sky)"><span>FREE TO SPEND</span><b data-key="al-fr" data-v="${A.free}">${F.usd(A.free)}</b></div>
+    </div>
+    <div class="abr" style="width:${availPct}%"><span>AVAILABLE CASH ${F0(A.available)}</span></div>
+    <div class="abar">${segs.map(s => `<button class="${s[4] ? 'hatched' : ''}" style="--c:var(--${s[2]});flex:${s[3]} 1 0" data-act="goto" data-id="accounts" title="${s[1]}: ${F.usd(s[3])}" aria-label="${s[1]} ${F.usd(s[3])}. Open accounts">${s[3]/total > .11 ? s[1].toUpperCase() : ''}</button>`).join('')}</div>
+    <div class="alegend">
+      <div class="alg" style="--c:var(--sky)"><span class="k">FREE TO SPEND</span><span class="v num">${F.usd(A.free)}</span><span class="n">Available cash after setting aside what is due.</span></div>
+      <div class="alg" style="--c:var(--peach)"><span class="k">RESERVED</span><span class="v num">${F.usd(A.reserved)}</span><span class="n">${A.resItems.length} bills due in ${S.ui.reserveDays} days. Part of available cash, not extra money.</span></div>
+      <div class="alg" style="--c:var(--violet)"><span class="k">RESTRICTED</span><span class="v num">${F.usd(A.restricted)}</span><span class="n">${A.restr.length ? h(names(A.restr)) + '. Not available right now.' : 'Nothing marked restricted.'}</span></div>
+      <div class="alg" style="--c:var(--lavender)"><span class="k">INVESTED</span><span class="v num">${F.usd(A.invested)}</span><span class="n">${h(names(A.inv))}. Not spendable cash.</span></div>
+    </div>
+    ${A.shortfall > 0.005 ? `<div class="warn">Reserve shortfall: obligations in the window exceed available cash by <b class="num">${F.usd(A.shortfall)}</b>.</div>` : ''}`;
+}
+function creditHTML(Cr){
+  const uc = Cr.util < .1 ? 'sky' : Cr.util < .3 ? 'gold' : 'rose';
+  return `<div class="bigstat" style="--c:var(--${uc})"><b data-key="cr-u" data-v="${Cr.util.toFixed(4)}">${(Cr.util*100).toFixed(1)}%</b><span>TOTAL UTILIZATION<br>${F.usd(Cr.owed)} OF ${F.usd(Cr.limit, { cents:false })}</span></div>
+    ${Cr.cards.map(c => `<div class="cu"><div class="cu-h"><span style="color:var(--${c.a.c})">${h(c.a.inst.toUpperCase())} ••${c.a.mask}</span><span class="r">${F.usd(c.owed)} / ${F.usd(c.a.limit, { cents:false })}</span></div>${segMeter(c.util, c.util < .1 ? 'sky' : c.util < .3 ? 'gold' : 'rose', [.1, .3])}<div class="cu-f">${(c.util*100).toFixed(1)}% used${c.pending ? ` · <span class="pend" style="--c:var(--gold)">${F.usd(c.pending)} PENDING</span>` : ''}</div></div>`).join('')}
+    <div class="note" style="--c:var(--tangerine)"><b>AVAILABLE CREDIT ${F.usd(Cr.avail)}</b><br>Borrowing capacity. Purser never counts it as money you have.</div>`;
+}
+let uid = 0;
+function niceTop(v){ const raw = v / 4, p = Math.pow(10, Math.floor(Math.log10(raw || 1))), m = raw / p, st = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; return st * 4; }
+function trendHTML(series, C){
+  const hid = S.ui.hidden, keys = [['spend','Spend'],['earn','Earn'],['save','Save'],['net','Net']];
+  const sel = series.filter(Boolean).find(s => inSel(s, C)) || series[series.length-1];
+  return `<div class="legend" role="group" aria-label="Series">${keys.map(([k,l]) => `<button class="lb sm round ${hid[k] ? 'offk' : ''}" style="--c:var(--${k})" data-act="legend" data-id="${k}" aria-pressed="${!hid[k]}">${hid[k] ? 'Show ' : ''}${l}</button>`).join('')}</div>
+    <div class="chart">${barsSVG(series, C)}</div>
+    ${hid.net ? '' : `<div class="chart">${netSVG(series, C)}</div>`}
+    <div class="readout" id="readout">${readoutHTML(sel)}</div>`;
+}
+const inSel = (s, C) => s && s.rg.start >= C.rg.start && s.rg.start <= C.rg.end;
+function readoutHTML(s){
+  if (!s) return '<span class="m">NO DATA</span>';
+  const p = s.pendIncluded && (s.pend.earn || s.pend.spend);
+  return `<span class="m">${s.mon} ’${s.yr}</span>
+    <div style="--c:var(--spend)"><span>SPEND</span><b>${F.usd(s.spend)}</b></div>
+    <div style="--c:var(--earn)"><span>EARN</span><b>${F.usd(s.earn)}</b></div>
+    <div style="--c:var(--save)"><span>SAVE</span><b>${F.usd(s.save)}</b></div>
+    <div style="--c:var(--${s.net < 0 ? 'neg' : 'net'})"><span>NET${p ? ' · INCL. PENDING' : ''}</span><b>${F.usd(s.net)}</b></div>`;
+}
+function barsSVG(series, C){
+  const id = ++uid, W = 960, H = 250, L = 54, R = 8, T = 16, B = 36, n = series.length, hid = S.ui.hidden;
+  const keys = ['spend','earn','save'].filter(k => !hid[k]);
+  let max = 0; series.forEach(s => s && keys.forEach(k => { max = Math.max(max, s[k]); }));
+  const top = niceTop(max || 100), y = v => T + (H-T-B) * (1 - v/top), gw = (W-L-R)/n, bw = Math.min(18, (gw-16)/Math.max(1, keys.length));
+  let g = '', bars = '', pend = '', hits = '';
+  for (let i=0; i<=4; i++){ const v = top*i/4, yy = y(v); g += `<line x1="${L}" x2="${W-R}" y1="${yy}" y2="${yy}" style="stroke:var(--rule);stroke-width:${i ? 1 : 2}"/><text x="${L-8}" y="${yy+4}" text-anchor="end" class="ax">${F.k(v)}</text>`; }
+  series.forEach((s, i) => {
+    const x0 = L + gw*i, cx = x0 + gw/2;
+    if (!s){ g += `<text x="${cx}" y="${H-14}" text-anchor="middle" class="ax" style="opacity:.5">—</text>`; return; }
+    const on = inSel(s, C);
+    if (on) g += `<rect x="${x0+3}" y="${T-8}" width="${gw-6}" height="${H-T-B+8}" style="fill:var(--gold);opacity:.08"/>`;
+    const bx0 = cx - (bw*keys.length + 3*(keys.length-1))/2;
+    keys.forEach((k, j) => {
+      const bx = bx0 + j*(bw+3), pv = s.pendIncluded ? (s.pend[k] || 0) : 0, real = Math.max(0, s[k] - pv);
+      bars += `<rect x="${bx}" y="${y(real)}" width="${bw}" height="${y(0)-y(real)}" style="fill:var(--${k})"/>`;
+      if (pv > 0) pend += `<rect x="${bx+.75}" y="${y(s[k])+.75}" width="${bw-1.5}" height="${Math.max(0, y(real)-y(s[k])-1.5)}" style="fill:url(#hp-${k}-${id});stroke:var(--${k});stroke-width:1.5;stroke-dasharray:3 2"/>`;
+    });
+    const lbl = s.mon === 'JAN' ? `JAN ’${s.yr}` : s.mon;
+    g += on ? `<rect x="${cx-26}" y="${H-28}" width="52" height="20" rx="10" style="fill:var(--gold)"/><text x="${cx}" y="${H-13}" text-anchor="middle" style="fill:#000;font-size:12.5px">${lbl}</text>` : `<text x="${cx}" y="${H-13}" text-anchor="middle" class="ax">${lbl}</text>`;
+    hits += `<rect x="${x0}" y="0" width="${gw}" height="${H}" style="fill:transparent;cursor:pointer" data-act="pickMonth" data-id="${s.off}" data-hover="${i}"><title>${s.mon} ${s.yr}: Spend ${F.usd(s.spend)}, Earn ${F.usd(s.earn)}, Save ${F.usd(s.save)}</title></rect>`;
+  });
+  const hp = ['spend','earn','save'].map(k => `<pattern id="hp-${k}-${id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.5" height="6" style="fill:var(--${k})"/></pattern>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly Spend, Earn and Save for 12 months"><defs><pattern id="sp${id}" width="10" height="6" patternUnits="userSpaceOnUse"><rect width="10" height="4" fill="#fff"/></pattern><mask id="sm${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="url(#sp${id})"/></mask>${hp}</defs>${g}<g mask="url(#sm${id})">${bars}</g>${pend}${hits}</svg>`;
+}
+function netSVG(series, C){
+  const W = 960, H = 112, L = 54, R = 8, T = 14, B = 14, n = series.length, gw = (W-L-R)/n;
+  const vals = series.map(s => s ? s.net : null).filter(v => v != null);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals); const span = niceTop(Math.max(hi - lo, 100)); if (hi - lo < span){ const pad = (span - (hi - lo)); hi += pad * (hi/(hi-lo || 1)); lo = hi - span; }
+  const y = v => T + (H-T-B) * (hi - v) / (hi - lo);
+  let g = `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--ink-3);stroke-width:1;stroke-dasharray:4 4"/><text x="${L-8}" y="${y(0)+4}" text-anchor="end" class="ax">$0</text><text x="${L-8}" y="${T+8}" text-anchor="end" class="ax" style="fill:var(--gold)">NET</text>`;
+  let path = '';
+  series.forEach((s, i) => {
+    if (!s) return; const x0 = L + gw*i, x1 = x0 + gw, yy = y(s.net), c = s.net < 0 ? 'neg' : 'net';
+    g += `<rect x="${x0+2}" y="${Math.min(yy, y(0))}" width="${gw-4}" height="${Math.abs(y(0)-yy)}" style="fill:var(--${c});opacity:.16"/>`;
+    path += (path ? `L${x0},${yy}` : `M${x0},${yy}`) + `L${x1},${yy}`;
+    if (inSel(s, C) || i === n-1) g += `<text x="${x0 + gw/2}" y="${s.net >= 0 ? yy-6 : yy+14}" text-anchor="middle" style="fill:var(--${c});font-size:12px">${F.k(s.net)}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly Net">${g}<path d="${path}" style="fill:none;stroke:var(--gold);stroke-width:2.5"/></svg>`;
+}
+function obligHTML(C){
+  const days = S.ui.reserveDays, list = C.alloc.obl;
+  const W = 960, H = 128, L = 26, R = 30, ax = H-30, x = d => L + (W-L-R) * d / days;
+  let g = `<rect x="${L}" y="${ax}" width="${W-L-R}" height="8" style="fill:var(--lilac)"/><rect x="${W-R}" y="${ax}" width="16" height="8" rx="4" style="fill:var(--lilac)"/>`;
+  for (let d=0; d<=days; d++){ const xx = x(d); g += `<rect x="${xx-.5}" y="${ax+10}" width="1" height="${d % 7 === 0 ? 8 : 4}" style="fill:var(--ink-3)"/>`; if (d % 7 === 0) g += `<text x="${xx}" y="${H-2}" text-anchor="${d === 0 ? 'start' : 'middle'}" class="ax">${d === 0 ? 'TODAY' : F.d(U.iso(U.addDays(U.parse(S.data.today), d)))}</text>`; }
+  const lanes = [-1e9, -1e9, -1e9];
+  list.forEach(o => {
+    const xx = x(o.days), label = `${o.name.split(' ')[0].toUpperCase()} ${F0(o.amount)}`, w = label.length*6.6 + 16;
+    let lane = lanes.findIndex(e => xx >= e + 6); if (lane < 0) lane = lanes.indexOf(Math.min(...lanes)); lanes[lane] = xx + w;
+    const yy = 6 + lane*28, c = o.reserve ? 'peach' : 'lilac';
+    g += `<line x1="${xx}" x2="${xx}" y1="${yy+18}" y2="${ax}" style="stroke:var(--${c});stroke-width:1;opacity:.6"/>`;
+    g += o.reserve ? `<rect x="${xx}" y="${yy}" width="${w}" height="20" rx="10" style="fill:var(--${c})"/><text x="${xx+8}" y="${yy+14.5}" style="fill:#000;font-size:12px">${h(label)}</text>`
+                   : `<rect x="${xx+.75}" y="${yy+.75}" width="${w-1.5}" height="18.5" rx="9.5" style="fill:var(--bg);stroke:var(--${c});stroke-width:1.5"/><text x="${xx+8}" y="${yy+14.5}" style="fill:var(--${c});font-size:12px">${h(label)}</text>`;
+  });
+  const res = U.sum(list.filter(o => o.reserve), o => o.amount), card = U.sum(list.filter(o => !o.reserve), o => o.amount);
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Obligations timeline">${g}</svg></div>
+    <div class="acts" style="margin:10px 0 14px;align-items:center"><span class="chip solid" style="--c:var(--peach)">Reserved from cash ${F.usd(res)}</span><span class="chip" style="--c:var(--lilac)">Card-billed ${F.usd(card)} · not reserved</span></div>
+    <div class="list">${list.slice(0, 9).map(o => `<div class="lrow" style="--c:var(--${o.reserve ? 'peach' : 'lilac'})"><span class="d">${F.d(o.due)}</span><span class="ds">${h(o.name)}<small>${o.days === 1 ? 'Tomorrow' : 'In ' + o.days + ' days'} · ${h(o.note || o.kind)}</small></span><span class="amt">${o.est ? '≈' : ''}${F.usd(o.amount)}<small>${o.reserve ? 'RESERVED' : 'ON CARD'}</small></span></div>`).join('')}</div>`;
+}
+function subsHTML(subs){
+  const max = subs.list.length ? subs.list[0].amount : 1;
+  return subs.list.map(t => `<div class="subrow" style="--c:var(--${t.projects.includes('aicraft') ? 'sky' : 'violet'})"><span class="n">${h(t.desc.replace(/^[A-Z]+ — /, ''))}${t.projects.includes('aicraft') ? ' <span class="tag" style="--c:var(--sky)">AI CRAFT</span>' : ''}</span><span class="v">${F.usd(t.amount)}</span><span class="b"><i style="width:${t.amount/max*100}%"></i></span></div>`).join('') +
+    `<div class="tot"><span>MONTHLY</span><b>${F.usd(subs.monthly)}</b></div><div class="tot" style="border:0;margin-top:4px;padding-top:0"><span>PER YEAR</span><b style="font-size:18px;color:var(--ink-2)">${F.usd(subs.monthly*12)}</b></div>`;
+}
+function cashMiniHTML(C){
+  const rows = Calc.cashLedger(S.data).slice(0, 4), open = S.data.tx.filter(t => t.kind === 'review' && !t.reviewed);
+  return `<div class="cashtop"><div class="v" data-key="cash-mini" data-v="${C.bal.cash}">${F.big(C.bal.cash)}</div>${open.length ? `<span class="chip" style="--c:var(--alert)">${open.length} to match</span>` : `<span class="chip" style="--c:var(--sky)">Reconciled</span>`}</div>
+    <div class="list">${rows.map(r => `<div class="lrow" style="--c:var(--${r.e >= 0 ? 'peach' : 'violet'});grid-template-columns:48px minmax(0,1fr) auto"><span class="d">${F.d(r.t.date)}</span><span class="ds">${h(r.t.desc.split(' — ')[0])}</span><span class="amt">${r.e >= 0 ? '+' : '−'}${F.usd(Math.abs(r.e))}</span></div>`).join('')}</div>
+    <div style="margin-top:12px"><button class="lb round wide" style="--c:var(--peach)" data-act="goto" data-id="accounts" data-open="cash">Open cash controls</button></div>`;
+}
+
+/* ── ACCOUNTS ── */
+function vAccounts(C){
+  const d = S.data, groups = [
+    ['cash','Available cash & deposits','sky', 'Restricted balances are listed here but excluded from Available Cash'],
+    ['invest','Invested','lavender', 'Market value. Not treated as spendable cash'],
+    ['credit','Credit','tangerine', 'Balances owed. Available credit is not money you have'],
+    ['loan','Loans','rose', 'Outstanding principal'],
+  ];
+  const sub = g => { const list = d.accounts.filter(a => a.group === g); return U.sum(list, a => C.bal[a.id]); };
+  return `<div class="grid">
+    <div class="s7 stack">${groups.map(([g, t, c, note], gi) => `<section style="--i:${gi}">${modHead(t, c, F.usd(sub(g)))}<p class="pdesc" style="margin:-4px 0 12px;font-size:14.5px;color:var(--ink-3)">${note}.</p><div class="grp-gap">${d.accounts.filter(a => a.group === g).map(a => acctRow(a, C)).join('')}</div></section>`).join('')}</div>
+    <div class="s5 stack">
+      <section id="cash-console" style="--i:4">${modHead('Cash on hand', 'peach', 'manual account')}${cashConsoleHTML(C)}</section>
+      <section style="--i:5">${modHead('Transfer recognition', 'alert', 'suggested matches')}${matchesHTML(C)}</section>
+      <section style="--i:6">${modHead('Assets & loans', 'rose', 'preview')}${assetsHTML(C)}</section>
+    </div>
+  </div>`;
+}
+function acctRow(a, C){
+  const open = !!S.ui.open[a.id], bal = C.bal[a.id];
+  const disp = a.group === 'credit' || a.group === 'loan' ? -bal : bal;
+  const chips = [];
+  if (a.restricted) chips.push(`<span class="tag p" style="--c:var(--violet)">RESTRICTED</span>`);
+  if (a.manual) chips.push(`<span class="tag o" style="--c:var(--peach)">MANUAL</span>`);
+  if (a.longTerm) chips.push(`<span class="tag o" style="--c:var(--lavender)">RETIREMENT</span>`);
+  if (a.id === 'cash'){ const n = S.data.tx.filter(t => t.kind === 'review' && !t.reviewed).length; if (n) chips.push(`<span class="tag" style="--c:var(--alert)">${n} TO MATCH</span>`); }
+  const pend = S.data.tx.filter(t => t.status === 'pending' && t.accountId === a.id);
+  if (pend.length) chips.push(`<span class="tag p" style="--c:var(--gold)">${pend.length} PENDING</span>`);
+  return `<div><button class="arow" style="--c:var(--${a.c})" data-act="acct" data-id="${a.id}" aria-expanded="${open}">
+      <span class="cap"></span><span class="nm"><b>${h(a.name.toUpperCase())}</b><small>${h(a.inst)}${a.mask ? ' ••' + a.mask : ''}</small></span>
+      <span class="bal" data-key="ac-${a.id}" data-v="${disp}">${a.group === 'credit' || a.group === 'loan' ? (disp > 0.005 ? '−' : '') + F.usd(Math.abs(disp)) : F.usd(disp)}</span><span class="chev">▸</span>
+      ${chips.length ? `<span class="tags">${chips.join('')}</span>` : ''}
+    </button>${open ? acctDetail(a, C) : ''}</div>`;
+}
+function sparkSVG(hist, c){
+  const W = 320, H = 84, P = 6, pts = hist.filter(p => p.v != null);
+  if (pts.length < 2) return '<div class="empty">Not enough history</div>';
+  const vs = pts.map(p => p.v), lo = Math.min(...vs), hi = Math.max(...vs), sp = hi - lo || 1, n = hist.length;
+  const x = i => P + (W-2*P) * i / (n-1), y = v => P + 12 + (H-2*P-24) * (hi - v) / sp;
+  const coords = hist.map((p,i) => p.v == null ? null : [x(i), y(p.v)]).filter(Boolean);
+  const line = coords.map((c,i) => (i ? 'L' : 'M') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join('');
+  const area = line + `L${coords[coords.length-1][0]},${H-P}L${coords[0][0]},${H-P}Z`, last = coords[coords.length-1];
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="12-month balance history"><line x1="${P}" x2="${W-P}" y1="${H-P}" y2="${H-P}" style="stroke:var(--rule)"/><path d="${area}" style="fill:var(--${c});opacity:.14"/><path d="${line}" style="fill:none;stroke:var(--${c});stroke-width:2"/><circle cx="${last[0]}" cy="${last[1]}" r="4" style="fill:var(--${c})"/><text x="${P}" y="10" class="ax" style="font-size:11px">HIGH ${F0(hi)}</text><text x="${W-P}" y="10" text-anchor="end" class="ax" style="font-size:11px">LOW ${F0(lo)}</text></svg>`;
+}
+function acctDetail(a, C){
+  const d = S.data, bal = C.bal[a.id], facts = [];
+  if (a.group === 'cash'){
+    facts.push(['Current balance', F.usd(bal)]);
+    const pend = U.sum(d.tx.filter(t => t.status === 'pending' && t.accountId === a.id), t => t.kind === 'income' ? t.amount : -t.amount);
+    if (pend) facts.push(['Pending', `<span class="pend" style="--c:var(--gold)">${F.usd(pend, { sign:true })}</span>`]);
+    if (a.apy) facts.push(['APY', a.apy.toFixed(2) + '%']);
+    facts.push(['Counts as', a.restricted ? 'Restricted. Excluded from Available Cash.' : 'Available Cash']);
+    if (a.restricted) facts.push(['Restriction', h(a.restrictedNote || '')]);
+  } else if (a.group === 'invest'){
+    facts.push(['Market value', F.usd(a.value)]); facts.push(['Counts as', a.longTerm ? 'Invested · retirement, long-term' : 'Invested · not spendable cash']);
+  } else if (a.group === 'credit'){
+    const c = C.credit.cards.find(x => x.a.id === a.id);
+    facts.push(['Balance owed', F.usd(c.owed)], ['Credit limit', F.usd(a.limit, { cents:false })], ['Available credit', F.usd(c.avail) + ' · not your money'], ['Utilization', (c.util*100).toFixed(1) + '%'], ['APR', a.apr + '%']);
+    if (c.pending) facts.push(['Pending charges', `<span class="pend" style="--c:var(--gold)">${F.usd(c.pending)}</span>`]);
+  } else {
+    const L = Calc.loan(d, C.bal); facts.push(['Principal left', F.usd(L.balance)], ['Original', F.usd(a.original, { cents:false })], ['Payment', F.usd(a.payment) + '/mo'], ['APR', a.apr + '%'], ['Payoff', F.dy(L.payoff)]);
+  }
+  facts.push(['Source', a.manual ? 'Manual entry (stays manual after Plaid)' : `Demo provider · Phase 2: Plaid ${h(a.plaid || '')}`], ['Last sync', h(a.lastSync)]);
+  const recent = d.tx.filter(t => (t.accountId === a.id || t.counterAccountId === a.id)).slice(-6).reverse();
+  const holdings = a.holdings ? `<div class="full"><div class="sublbl">Holdings</div><div class="tw"><table class="tbl" style="min-width:0"><thead><tr><th>Holding</th><th>Qty</th><th>Value</th><th>Share</th></tr></thead><tbody>${a.holdings.map(x => `<tr style="--c:var(--${a.c})"><td>${h(x[0])}</td><td>${x[1] == null ? '—' : x[1]}</td><td>${F.usd(x[2])}</td><td>${(x[2]/a.value*100).toFixed(1)}%</td></tr>`).join('')}</tbody></table></div></div>` : '';
+  const actions = [];
+  if (a.group === 'cash') actions.push(`<button class="lb round sm" style="--c:var(--violet)" data-act="restrict" data-id="${a.id}">${a.restricted ? 'Release restriction' : 'Mark restricted'}</button>`);
+  if (a.id === 'cash') actions.push(`<button class="lb round sm" style="--c:var(--peach)" data-act="focusCash" data-id="cash">Cash controls</button>`);
+  if (!a.manual) actions.push(`<button class="lb round sm" disabled>Resync · Phase 2</button>`);
+  return `<div class="adet" style="--c:var(--${a.c})">
+    <div><div class="sublbl">Balance · 12 months</div><div class="chart small">${sparkSVG(Calc.history(d, a), a.c)}</div></div>
+    <dl class="kv">${facts.map(f => `<dt>${f[0]}</dt><dd>${f[1]}</dd>`).join('')}</dl>
+    ${holdings}
+    <div class="full"><div class="acts">${actions.join('')}</div></div>
+    ${recent.length ? `<div class="full"><div class="sublbl">Recent activity</div><div class="list">${recent.map(t => txRow(t, { acct:a.id })).join('')}</div></div>` : ''}
+  </div>`;
+}
+A.focusCash = () => { setTimeout(() => { const el = $('#cash-console'); if (el) el.scrollIntoView({ behavior:S.ui.reduceMotion ? 'auto' : 'smooth', block:'start' }); }, 30); return false; };
+const CASH_MODES = [['set','Set balance','violet'],['in','Cash in','sky'],['out','Cash spent','tangerine'],['atm','ATM withdrawal','lilac'],['deposit','Deposit to bank','peach']];
+function cashConsoleHTML(C){
+  const u = S.ui, open = S.data.tx.filter(t => t.kind === 'review' && !t.reviewed), dep = open.filter(t => t.match.suggest === 'deposit');
+  const keys = ['7','8','9','4','5','6','1','2','3','.','0','del'];
+  const rows = Calc.cashLedger(S.data).slice(0, 7);
+  const tagsable = u.cashMode === 'in' || u.cashMode === 'out';
+  return `<div class="cashtop"><div class="v" data-key="cash" data-v="${C.bal.cash}">${F.big(C.bal.cash)}</div>${open.length ? `<span class="chip" style="--c:var(--alert)">${open.length} bank items to match</span>` : `<span class="chip" style="--c:var(--sky)">All matched</span>`}</div>
+    ${dep.length ? `<div class="warn" style="margin:0 0 14px">Possible double count: a ${F.usd(U.sum(dep, t => t.amount))} teller deposit is already in Checking. If it came from this cash, Cash on Hand is overstated until you confirm the match below.</div>` : ''}
+    <div class="cmodes" role="group" aria-label="Cash action">${CASH_MODES.map(([k, l, c]) => `<button class="lb sm ${k === 'set' ? 'rl' : ''} ${k === 'deposit' ? 'rr' : ''} ${u.cashMode === k ? 'on' : ''}" style="--c:var(--${c})" data-act="cashMode" data-id="${k}" aria-pressed="${u.cashMode === k}">${l}</button>`).join('')}</div>
+    <div class="cpad">
+      <div>
+        <label class="fl" for="cash-amt">${u.cashMode === 'set' ? 'Counted cash' : 'Amount'}<input id="cash-amt" class="amt-in" inputmode="decimal" autocomplete="off" placeholder="$0.00" data-in="cashAmt" value="${h(u.cashAmt ? '$' + u.cashAmt : '')}"></label>
+        <div class="keys">${keys.map(k => `<button class="lb" style="--c:var(--${k === 'del' ? 'rose' : k === '.' ? 'lilac' : 'peach'})" data-act="key" data-id="${k}" aria-label="${k === 'del' ? 'Delete digit' : k}">${k === 'del' ? '⌫' : k}</button>`).join('')}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+        <label class="fl" for="cash-note">Note<input id="cash-note" class="txt-in" autocomplete="off" placeholder="${u.cashMode === 'in' ? 'e.g. Sold amp locally' : u.cashMode === 'out' ? 'e.g. Farmers market' : 'Optional'}" data-in="cashNote" value="${h(u.cashNote)}"></label>
+        ${tagsable ? `<div><div class="sublbl">Tag projects</div><div class="acts">${['resale','gambling','aicraft'].filter(p => p !== 'gambling' || u.gambling).map(p => { const P = S.data.projects.find(x => x.id === p); return `<button class="lb round sm ${u.cashTags[p] ? 'on' : ''}" style="--c:var(--${P.c})" data-act="cashTag" data-id="${p}" aria-pressed="${!!u.cashTags[p]}">${h(P.name)}</button>`; }).join('')}</div></div>` : ''}
+        <div class="prev" id="cash-preview" style="--c:var(--${CASH_MODES.find(m => m[0] === u.cashMode)[2]})">${cashPreview()}</div>
+        <button class="lb round" style="--c:var(--gold);height:44px;font-size:17px" data-act="cashExec">Record ${h(CASH_MODES.find(m => m[0] === u.cashMode)[1].toLowerCase())}</button>
+      </div>
+    </div>
+    <div class="sublbl" style="margin-top:20px">Cash ledger · running balance</div>
+    <div class="list">${rows.map(r => txRow(r.t, { acct:'cash', bal:r.bal, showProjects:true })).join('')}</div>`;
+}
+function cashPreview(){
+  const u = S.ui, amt = parseFloat(u.cashAmt), cash = Ledger.balance(S.data, 'cash'), chk = Ledger.balance(S.data, 'checking');
+  if (!u.cashAmt) return `<p>${{ set:'Count your cash and enter the total. Any difference is recorded as a reconciliation adjustment, not as Spend or Earn.', in:'Cash you received as income. Counts in Earn.', out:'Cash you spent. Counts in Spend.', atm:'Moves money from Checking to Cash on Hand. A transfer, so total money is unchanged.', deposit:'Moves money from Cash on Hand into Checking. A transfer, so total money is unchanged.' }[u.cashMode]}</p>`;
+  const err = cashCheck(u.cashMode, amt, cash); if (err) return `<div class="bad">${h(err)}</div>`;
+  const ln = (k, a, b) => `<div class="ln"><span>${k}</span><b>${F.usd(a)} → ${F.usd(b)}</b></div>`;
+  switch (u.cashMode){
+    case 'set': { const d = U.r2(amt - cash); return ln('CASH ON HAND', cash, amt) + `<div class="ln"><span>ADJUSTMENT</span><b>${F.usd(d, { sign:true })}</b></div><div class="ok">NOT COUNTED AS SPEND OR EARN</div>`; }
+    case 'in': return ln('CASH ON HAND', cash, cash + amt) + `<div class="ln"><span>EARN</span><b>+${F.usd(amt)}</b></div>`;
+    case 'out': return ln('CASH ON HAND', cash, cash - amt) + `<div class="ln"><span>SPEND</span><b>+${F.usd(amt)}</b></div>`;
+    case 'atm': return ln('CHECKING', chk, chk - amt) + ln('CASH ON HAND', cash, cash + amt) + `<div class="ok">TOTAL MONEY UNCHANGED · TRANSFER</div>`;
+    case 'deposit': return ln('CASH ON HAND', cash, cash - amt) + ln('CHECKING', chk, chk + amt) + `<div class="ok">TOTAL MONEY UNCHANGED · TRANSFER</div>`;
+  }
+}
+function matchesHTML(){
+  const items = Calc.reviews(S.data), open = items.filter(t => !t.reviewed), done = items.filter(t => t.reviewed);
+  const cash = Ledger.balance(S.data, 'cash'), chk = Ledger.balance(S.data, 'checking');
+  return `<p class="pdesc" style="font-size:15px;margin:-4px 0 14px">Synced bank items that look like cash movement. Purser suggests a match; you confirm. Confirmed matches become transfers, never income or spending.</p>
+    ${open.map(t => { const dep = t.match.suggest === 'deposit'; return `<div class="match" style="--c:var(--${dep ? 'peach' : 'lilac'})">
+      <div class="hd"><span>${h(t.desc)}</span><span class="num">${dep ? '+' : '−'}${F.usd(t.amount)}</span></div>
+      <div class="acts"><span class="tag o" style="--c:var(--ink-2)">CHECKING · ${F.d(t.date)}</span><span class="tag" style="--c:var(--${t.match.confidence === 'HIGH' ? 'sky' : 'gold'})">${t.match.confidence} CONFIDENCE</span></div>
+      <p><b style="color:var(--ink)">Suggested: ${dep ? 'cash deposit from Cash on Hand' : 'ATM withdrawal into Cash on Hand'}.</b> ${h(t.match.why)}</p>
+      <div class="prev" style="min-height:0;--c:var(--${dep ? 'peach' : 'lilac'})"><div class="ln"><span>IF CONFIRMED · CASH ON HAND</span><b>${F.usd(cash)} → ${F.usd(cash + (dep ? -t.amount : t.amount))}</b></div><div class="ln"><span>CHECKING (ALREADY SYNCED)</span><b>${F.usd(chk)} · no change</b></div><div class="ok">TOTAL MONEY UNCHANGED</div></div>
+      <div class="acts"><button class="lb round sm" style="--c:var(--gold)" data-act="match" data-id="${t.id}" data-v="yes">Confirm match</button><button class="lb round sm" style="--c:var(--lilac)" data-act="match" data-id="${t.id}" data-v="no">Not cash</button></div>
+    </div>`; }).join('') || '<div class="empty">No suggested matches waiting.</div>'}
+    ${done.length ? `<div class="sublbl" style="margin-top:14px">Reviewed</div><div class="list">${done.map(t => `<div class="lrow" style="--c:var(--${t.reviewed === 'confirmed' ? 'sky' : 'lilac'})"><span class="d">${F.d(t.date)}</span><span class="ds">${h(t.desc)}<small>${t.reviewed === 'confirmed' ? 'Confirmed as transfer with Cash on Hand' : 'Not cash · waiting for categorization (Phase 2)'}</small></span><span class="amt">${F.usd(t.amount)}</span></div>`).join('')}</div>` : ''}`;
+}
+function assetsHTML(C){
+  const L = Calc.loan(S.data, C.bal);
+  return `<div class="sublbl">Auto loan payoff</div>
+    <div class="bigstat" style="--c:var(--rose);margin-bottom:10px"><b style="font-size:44px" data-key="loan" data-v="${L.balance}">${F.usd(L.balance, { cents:false })}</b><span>PRINCIPAL LEFT<br>${L.months} PAYMENTS · PAID OFF ${F.dy(L.payoff).toUpperCase()}</span></div>
+    ${segMeter(L.pct, 'rose', [], 30)}
+    <div class="cu-f" style="margin:8px 0 6px">${(L.pct*100).toFixed(1)}% of ${F.usd(L.a.original, { cents:false })} repaid. Interest paid since tracking began: ${F.usd(L.interest)} (counted in Spend). Principal payments are transfers.</div>
+    <div class="sublbl" style="margin-top:18px">Major purchases register</div>
+    <div class="tw"><table class="tbl"><thead><tr><th>Item</th><th>Acquired</th><th>Price</th><th>Financing</th><th>Project</th></tr></thead><tbody>
+      ${S.data.assets.map(x => `<tr style="--c:var(--${x.project ? S.data.projects.find(p => p.id === x.project).c : 'rose'})"><td>${h(x.name)}${x.note ? `<br><small style="color:var(--ink-3)">${h(x.note)}</small>` : ''}</td><td>${/^\d{4}-/.test(x.acquired) ? F.d(x.acquired) + ' ’' + x.acquired.slice(2,4) : h(x.acquired)}</td><td>${x.price ? F.usd(x.price, { cents:false }) : '—'}</td><td style="white-space:normal">${h(x.financing)}</td><td>${x.project ? h(S.data.projects.find(p => p.id === x.project).name) : '—'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="note" style="--c:var(--rose);margin-top:8px">Physical assets are listed, not valued. Purser never adds them to your money. A full register with sale tracking comes in a later phase.</div>`;
+}
+
+/* ── PROJECTS ── */
+function vProjects(C){
+  const u = S.ui, d = S.data, projs = d.projects.filter(p => p.id !== 'gambling' || u.gambling);
+  if (!projs.find(p => p.id === u.project)) u.project = projs[0].id;
+  const P = projs.find(p => p.id === u.project), R = Calc.project(d, P.id, C.rg, C.pendOn);
+  const endOff = Math.min(0, (u.period === 'month' ? u.monthOffset : 0) + 11), series = Calc.series(d, endOff, 12, { project:P.id, includePending:C.pendOn });
+  const others = Object.entries(R.withOthers).map(([k, n]) => `${n} with ${d.projects.find(p => p.id === k).name}`).join(', ');
+  const panel = { aicraft:aiPanel, resale:resalePanel, bonuses:bonusPanel, gambling:gamblingPanel }[P.id](R, C);
+  return `<div class="grid">
+    <section class="s12" style="--i:0">
+      <div class="psel" role="group" aria-label="Project">${projs.map((p, i) => `<button class="lb ${i === 0 ? 'rl' : ''} ${p.id === u.project ? 'on' : ''}" style="--c:var(--${p.c})" data-act="project" data-id="${p.id}" aria-pressed="${p.id === u.project}">${h(p.name)}</button>`).join('')}<button class="lb rr" disabled>New project · future</button></div>
+      <p class="pdesc">${h(P.desc)}</p>
+      ${modHead(P.name + ' · readout', P.c, C.rg.short)}${metricsHTML(R.m, C, 'pj-' + P.id, C.rg.short)}
+      ${R.shared.length ? `<div class="netnote" style="border-color:var(--${P.c})"><span><b>${R.shared.length} shared records</b> in this period (${h(others)}). Projects are views of one ledger, so personal totals count each record once.</span></div>` : ''}
+    </section>
+    <section class="s7" style="--i:1">${modHead('Monthly net · ' + P.name, P.c, '12 months')}<div class="chart">${projSVG(series, P, C)}</div>
+      <div style="margin-top:22px">${modHead('Records', P.c, R.txs.length + ' in period')}<div class="list">${R.txs.slice(0, 30).map(t => txRow(t, { project:P.id })).join('') || '<div class="empty">No records in this period.</div>'}</div>${R.txs.length > 30 ? `<div class="empty" style="margin-top:6px">${R.txs.length - 30} older records not shown. Narrow the period to see them.</div>` : ''}</div></section>
+    <section class="s5 stack" style="--i:2">${panel}</section>
+  </div>`;
+}
+function projSVG(series, P, C){
+  const W = 760, H = 220, L = 54, R = 8, T = 16, B = 30, n = series.length, gw = (W-L-R)/n, bw = Math.min(30, gw-12);
+  const vals = series.filter(Boolean).map(s => s.net); let hi = Math.max(0, ...vals), lo = Math.min(0, ...vals); if (hi - lo < 50){ hi += 25; lo -= 25; }
+  const y = v => T + (H-T-B) * (hi - v) / (hi - lo); let g = '';
+  [hi, 0, lo].forEach(v => { if (v === 0 || Math.abs(v) > 1) g += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" style="stroke:var(--${v === 0 ? 'ink-3' : 'rule'});stroke-width:1${v === 0 ? '' : ';stroke-dasharray:3 4'}"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" class="ax">${F.k(v)}</text>`; });
+  series.forEach((s, i) => {
+    const cx = L + gw*i + gw/2; if (!s) return;
+    const c = s.net < 0 ? 'neg' : P.c, on = inSel(s, C);
+    if (on) g += `<rect x="${cx-gw/2+3}" y="${T-8}" width="${gw-6}" height="${H-T-B+8}" style="fill:var(--gold);opacity:.08"/>`;
+    g += `<rect x="${cx-bw/2}" y="${Math.min(y(s.net), y(0))}" width="${bw}" height="${Math.max(1, Math.abs(y(s.net)-y(0)))}" style="fill:var(--${c})"><title>${s.mon} ${s.yr}: Net ${F.usd(s.net)} (Spend ${F.usd(s.spend)}, Earn ${F.usd(s.earn)}, Save ${F.usd(s.save)})</title></rect>`;
+    g += `<text x="${cx}" y="${H-10}" text-anchor="middle" class="ax" style="${on ? 'fill:var(--gold)' : ''}">${s.mon}</text>`;
+    if (Math.abs(s.net) >= 1 && (on || Math.abs(s.net) === Math.max(...vals.map(Math.abs)))) g += `<text x="${cx}" y="${s.net >= 0 ? y(s.net)-5 : y(s.net)+13}" text-anchor="middle" style="fill:var(--${c});font-size:11.5px">${F.k(s.net)}</text>`;
+    g += `<rect x="${cx-gw/2}" y="0" width="${gw}" height="${H}" style="fill:transparent;cursor:pointer" data-act="pickMonth" data-id="${s.off}"><title>${s.mon} ${s.yr}: Net ${F.usd(s.net)}</title></rect>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${h(P.name)} monthly net">${g}</svg>`;
+}
+function aiPanel(R, C){
+  const d = S.data, txs = R.txs.filter(t => t.status === 'posted' || C.pendOn);
+  const cats = {}; for (const t of txs) if (t.kind === 'expense') cats[t.category] = (cats[t.category]||0) + t.amount;
+  const catList = Object.entries(cats).sort((a,b) => b[1]-a[1]), cmax = catList.length ? catList[0][1] : 1;
+  const tags = ['discovered','researched','organized','assisted','executed'].map(k => { const list = txs.filter(t => t.ai === k); return [k, list.length, U.sum(list, t => t.amount)]; });
+  const tmax = Math.max(1, ...tags.map(t => t[1])), hours = U.sum(d.timeLog, x => x.hours);
+  return `<section>${modHead('Cost structure', 'sky', C.rg.short)}${catList.map(([k, v]) => `<div class="tagrow" style="--c:var(--sky)"><span class="k">${h(k.replace('AI ','').toUpperCase())}</span><span class="b"><i style="width:${v/cmax*100}%"></i></span><span class="v">${F.usd(v)}</span></div>`).join('') || '<div class="empty">No AI Craft costs in this period.</div>'}</section>
+    <section>${modHead('AI involvement', 'lavender', 'descriptive')}${tags.map(([k, n, v]) => `<div class="tagrow" style="--c:var(--${AI_C[k]})"><span class="k">${k.toUpperCase()}</span><span class="b"><i style="width:${n/tmax*100}%"></i></span><span class="v">${n} rec · ${F.usd(v, { cents:false })} involved</span></div>`).join('')}
+      <div class="note" style="--c:var(--lavender);margin-top:10px">Tags describe how AI took part. They don't assign financial credit to AI, and there is no Mac mini payback meter. The dollar column is the size of the records involved, not what AI earned.</div></section>
+    <section>${modHead('Time logged', 'lilac', hours + ' h')}<div class="list">${d.timeLog.slice().reverse().map(x => `<div class="lrow" style="--c:var(--${AI_C[x.ai]})"><span class="d">${F.d(x.date)}</span><span class="ds">${h(x.note)}<small>AI ${x.ai}</small></span><span class="amt">${x.hours} h</span></div>`).join('')}</div>
+      <div class="note" style="--c:var(--lilac);margin-top:8px">Hours as you reported them. Purser never converts time into dollars.</div></section>`;
+}
+function resalePanel(R, C){
+  const all = Calc.resale(S.data).filter(s => s.date >= C.rg.start && s.date <= C.rg.end);
+  const tot = k => U.sum(all, s => s[k]);
+  return `<section>${modHead('Sales register', 'tangerine', all.length + ' items')}
+    <div class="tw"><table class="tbl"><thead><tr><th>Item</th><th>Sold</th><th>Gross</th><th>Fees</th><th>Ship</th><th>Net proceeds</th><th>Cost basis</th><th>Realized P/L</th></tr></thead><tbody>
+    ${all.map(s => `<tr style="--c:var(--${s.ai ? 'sky' : 'tangerine'})"><td>${h(s.item)}${s.status === 'pending' ? ' <span class="tag p" style="--c:var(--gold)">PENDING</span>' : ''}${s.ai ? ` <span class="tag o" style="--c:var(--${AI_C[s.ai]})">AI ${s.ai}</span>` : ''}</td><td>${F.d(s.date)}</td><td>${F.usd(s.gross)}</td><td>${F.usd(s.fees)}</td><td>${F.usd(s.ship)}</td><td>${F.usd(s.net)}</td><td>${F.usd(s.cost, { cents:false })}<br><small style="color:var(--ink-3)">${h(s.acquired)}</small></td><td class="${s.pl >= 0 ? 'pos' : 'negc'}">${F.usd(s.pl, { sign:true })}</td></tr>`).join('') || '<tr><td colspan="8" style="color:var(--ink-3)">No sales in this period.</td></tr>'}
+    </tbody>${all.length ? `<tfoot><tr><td>Totals</td><td></td><td>${F.usd(tot('gross'))}</td><td>${F.usd(tot('fees'))}</td><td>${F.usd(tot('ship'))}</td><td>${F.usd(tot('net'))}</td><td>${F.usd(tot('cost'), { cents:false })}</td><td class="${tot('pl') >= 0 ? 'pos' : 'negc'}">${F.usd(tot('pl'), { sign:true })}</td></tr></tfoot>` : ''}</table></div></section>
+    <section><div class="kv">
+      <dt>Net proceeds</dt><dd>Cash you actually received after fees and shipping. Payouts count in Earn, shipping labels in Spend.</dd>
+      <dt>Cost basis</dt><dd>What you originally paid. These items were bought before tracking began, so the cost is never counted as Spend here.</dd>
+      <dt>Realized P/L</dt><dd>Net proceeds minus cost basis. Most used gear sells at a loss against its purchase price, and that is shown plainly.</dd></div></section>`;
+}
+function bonusPanel(R, C){
+  const posted = R.txs.filter(t => t.kind === 'income' && t.status === 'posted'), pend = R.txs.filter(t => t.kind === 'income' && t.status === 'pending');
+  const fees = R.txs.filter(t => t.kind === 'expense'), active = S.data.ideas.filter(o => o.stage === 'track' || o.stage === 'reconcile' || o.stage === 'guide');
+  return `<section>${modHead('Requirements in progress', 'gold', active.length + ' active')}${active.map(o => `<div class="cu"><div class="cu-h"><span style="color:var(--${STAGES[stageIdx(o.stage)][2]})">${h(o.title.split(' — ')[0].toUpperCase())}</span><span class="r">${STAGES[stageIdx(o.stage)][1].toUpperCase()}</span></div>${o.reqs.map(r => `${segMeter(r.cur/r.target, r.cur >= r.target ? 'sky' : 'gold', [], 20)}<div class="cu-f">${h(r.label)}: ${r.unit === '$' ? F.usd(r.cur, { cents:false }) + ' of ' + F.usd(r.target, { cents:false }) : r.cur + ' of ' + r.target + (r.unit === 'd' ? ' days' : '')}</div>`).join('')}</div>`).join('')}
+      <div class="acts"><button class="lb round sm" style="--c:var(--sky)" data-act="view" data-id="ideas">Open Ideas pipeline</button></div></section>
+    <section>${modHead('Posted in period', 'gold', F.usd(U.sum(posted, t => t.amount)))}<div class="list">${posted.slice(0, 8).map(t => txRow(t, { project:'bonuses' })).join('') || '<div class="empty">Nothing posted in this period.</div>'}</div>
+      ${pend.length ? `<div class="note" style="--c:var(--gold);margin-top:8px">${pend.length} pending (${F.usd(U.sum(pend, t => t.amount))}). Shown in Earn only with Include Pending on, and only because the bank reports it as pending.</div>` : ''}
+      ${fees.length ? `<div class="note" style="--c:var(--tangerine);margin-top:8px">Fees charged in period: ${F.usd(U.sum(fees, t => t.amount))}. Counted in Spend against these bonuses.</div>` : ''}</section>`;
+}
+function gamblingPanel(R, C){
+  const ss = S.data.sessions.filter(s => s.date >= C.rg.start && s.date <= C.rg.end).slice().reverse(), net = U.sum(ss, s => s.net);
+  return `<section>${modHead('Sessions', 'rose', ss.length + ' in period')}<div class="tw"><table class="tbl" style="min-width:420px"><thead><tr><th>Session</th><th>Date</th><th>Stake</th><th>Cash-out</th><th>Net</th></tr></thead><tbody>
+    ${ss.map(s => `<tr style="--c:var(--rose)"><td>${h(s.venue)}</td><td>${F.d(s.date)}</td><td>${F.usd(s.stake, { cents:false })}</td><td>${F.usd(s.cashout, { cents:false })}</td><td class="${s.net >= 0 ? 'pos' : 'negc'}">${F.usd(s.net, { sign:true, cents:false })}</td></tr>`).join('') || '<tr><td colspan="5" style="color:var(--ink-3)">No sessions in this period.</td></tr>'}
+    </tbody>${ss.length ? `<tfoot><tr><td>Net</td><td></td><td>${F.usd(U.sum(ss, s => s.stake), { cents:false })}</td><td>${F.usd(U.sum(ss, s => s.cashout), { cents:false })}</td><td class="${net >= 0 ? 'pos' : 'negc'}">${F.usd(net, { sign:true, cents:false })}</td></tr></tfoot>` : ''}</table></div>
+    <div class="note" style="--c:var(--rose);margin-top:8px">Each session posts once at its net result to Cash on Hand. Stakes are not counted as Spend and cash-outs are not counted as Earn, so totals are not inflated. Turn this project off in Settings.</div></section>`;
+}
+
+/* ── IDEAS ── */
+function vIdeas(C){
+  const u = S.ui, d = S.data, all = d.ideas;
+  const active = all.filter(o => stageIdx(o.stage) >= 0), done = all.filter(o => o.stage === 'done' || o.stage === 'passed');
+  const list = u.ideaFilter === 'all' ? active : u.ideaFilter === 'closed' ? done : all.filter(o => o.stage === u.ideaFilter);
+  if (!all.find(o => o.id === u.idea) && list[0]) u.idea = list[0].id;
+  const sel = idea(u.idea) || list[0];
+  const potential = U.sum(active, o => o.value), realized = U.sum(d.tx.filter(t => t.status === 'posted' && t.projects.includes('bonuses') && t.sub === 'bonus'), t => t.amount);
+  return `<div class="grid">
+    <section class="s12" style="--i:0">
+      <div class="banner"><b>SAMPLE OPPORTUNITIES</b><span>Fictional institutions and illustrative terms. Not real offers. Hermes discovery and research arrive in Phase 4.</span></div>
+      <div class="pipe" role="group" aria-label="Pipeline stage filter">${STAGES.map(([k, l, c]) => { const n = all.filter(o => o.stage === k).length; return `<button class="stg ${u.ideaFilter !== 'all' && u.ideaFilter !== k ? 'dim' : ''}" style="--c:var(--${c})" data-act="ideaFilter" data-id="${u.ideaFilter === k ? 'all' : k}" aria-pressed="${u.ideaFilter === k}"><b>${n}</b><span>${l.toUpperCase()}</span></button>`; }).join('')}</div>
+      <div class="pstat">
+        <div style="--c:var(--lilac)"><span>POTENTIAL IN PIPELINE</span><b>${F.usd(potential, { cents:false })}</b><small>Estimated. Never counted in Earn or Save.</small></div>
+        <div style="--c:var(--gold)"><span>BONUSES REALIZED · LIFETIME</span><b data-key="id-real" data-v="${realized}">${F.usd(realized, { cents:false })}</b><small>Posted only. Recorded at Reconcile.</small></div>
+        <div style="--c:var(--rose)"><span>GUARDRAIL</span><b style="font-size:20px;line-height:1.2">You act. Hermes advises.</b><small>No applications, transfers or purchases are made for you.</small></div>
+      </div>
+    </section>
+    <section class="s5" style="--i:1">${modHead(u.ideaFilter === 'all' ? 'All active' : u.ideaFilter === 'closed' ? 'Closed' : STAGES[stageIdx(u.ideaFilter)][1], 'sky', list.length + ' items')}
+      ${list.map(o => { const si = stageIdx(o.stage), c = si >= 0 ? STAGES[si][2] : o.stage === 'done' ? 'gold' : 'off'; return `<button class="idea ${sel && sel.id === o.id ? 'sel' : ''}" style="--c:var(--${c})" data-act="idea" data-id="${o.id}"><span class="cap"></span><span class="t">${h(o.title)}</span><span class="v">${h(o.valueText)}</span><span class="m"><span class="tag o" style="--c:var(--${c})">${si >= 0 ? STAGES[si][1].toUpperCase() : o.stage.toUpperCase()}</span>${h(o.type)}${o.deadline ? ' · by ' + F.d(o.deadline) : ''}</span></button>`; }).join('') || '<div class="empty">Nothing here.</div>'}
+      <div class="acts" style="margin-top:10px"><button class="lb round sm ${u.ideaFilter === 'closed' ? 'on' : ''}" style="--c:var(--violet)" data-act="ideaFilter" data-id="${u.ideaFilter === 'closed' ? 'all' : 'closed'}">Closed (${done.length})</button><button class="lb round sm" disabled>Ask Hermes to discover · Phase 4</button></div>
+    </section>
+    <section class="s7" style="--i:2">${sel ? ideaDetail(sel, C) : '<div class="empty">Select an opportunity.</div>'}</section>
+  </div>`;
+}
+function ideaDetail(o, C){
+  const si = stageIdx(o.stage), c = si >= 0 ? STAGES[si][2] : 'gold', fit = Calc.ideaFit(S.data, o, C), fitC = { GOOD:'sky', PARTIAL:'gold', POOR:'rose', UNKNOWN:'lilac' }[fit.level];
+  const reached = k => o.stage === 'done' || (si >= 0 && si >= stageIdx(k));
+  let actions = '';
+  if (o.stage === 'discover') actions = `<button class="lb round" style="--c:var(--lilac)" data-act="ideaAdvance" data-id="${o.id}">Evaluate ▸</button><button class="lb round" style="--c:var(--off);color:var(--ink-2)" data-act="ideaPass" data-id="${o.id}">Dismiss</button>`;
+  if (o.stage === 'evaluate') actions = `<button class="lb round" style="--c:var(--lavender)" data-act="ideaAdvance" data-id="${o.id}">Pursue · start guide ▸</button><button class="lb round" style="--c:var(--off);color:var(--ink-2)" data-act="ideaPass" data-id="${o.id}">Pass</button>`;
+  if (o.stage === 'guide'){ const ok = o.done.length === o.steps.length; actions = `<button class="lb round" style="--c:var(--peach)" data-act="ideaAdvance" data-id="${o.id}" ${ok ? '' : 'disabled'}>${ok ? 'Steps done · start tracking ▸' : `Complete steps (${o.done.length}/${o.steps.length})`}</button>`; }
+  if (o.stage === 'track'){ const ok = o.reqs.every(r => r.cur >= r.target); actions = ok ? `<button class="lb round" style="--c:var(--gold)" data-act="ideaAdvance" data-id="${o.id}">Requirements met · reconcile ▸</button>` : `<button class="lb round" style="--c:var(--peach)" data-act="ideaSim" data-id="${o.id}">Simulate progress · demo</button>`; }
+  if (o.stage === 'passed') actions = `<button class="lb round" style="--c:var(--lilac)" data-act="ideaRestore" data-id="${o.id}">Reopen</button>`;
+  const rv = S.ui.recon[o.id] || {};
+  return `${modHead(o.type, c, si >= 0 ? 'stage ' + (si+1) + ' of 5' : o.stage)}
+    <div class="dtitle">${h(o.title)}</div>
+    <div class="acts" style="align-items:center;margin-bottom:4px"><span class="chip solid" style="--c:var(--${c})">${h(o.valueText)}</span><span class="chip" style="--c:var(--lilac)">${o.stage === 'done' ? 'REALIZED' : 'POTENTIAL · NOT COUNTED'}</span>${o.ai ? `<span class="chip" style="--c:var(--${AI_C[o.ai]})">AI ${o.ai}</span>` : ''}<span class="chip demo">SAMPLE</span></div>
+    <div class="stagebar" style="--c:var(--${c})">${STAGES.map((s, i) => `<i class="${o.stage === 'done' || i <= si ? 'on' : ''}" title="${s[1]}"></i>`).join('')}</div>
+    <p style="font-size:16.5px;line-height:1.45;margin:0 0 18px;max-width:64ch">${h(o.summary)}</p>
+    ${o.status && o.stage !== 'done' ? `<div class="note" style="--c:var(--${c});margin-bottom:18px">${h(o.status)}</div>` : ''}
+    ${o.stage === 'done' ? `<div class="note" style="--c:var(--gold);margin-bottom:18px"><b>Recorded ${F.usd(o.realized.amount)} on ${F.dy(o.realized.date)}</b> as realized ${o.realized.kind === 'saving' ? 'Save' : 'Earn'}. Ledger record ${h(o.realized.id)}.</div>` : ''}
+    <div class="dsec"><div class="sublbl">Evaluation</div>${reached('evaluate') || o.stage === 'passed' ? `<dl class="kv">${Object.entries(o.eval).map(([k, v]) => `<dt>${k}</dt><dd>${h(v)}</dd>`).join('')}</dl><div class="fit" style="--c:var(--${fitC});margin-top:12px"><b>FIT · ${fit.level}</b><ul>${fit.why.map(w => `<li>${h(w)}</li>`).join('')}</ul></div>` : `<div class="empty">Not evaluated yet. Evaluating checks eligibility, requirements, fees, deadlines, credit impact and fit against your actual balances.</div>`}</div>
+    ${reached('guide') ? `<div class="dsec"><div class="sublbl">Guide · you complete each step</div>${o.steps.map((s, k) => `<button class="step ${o.done.includes(k) ? 'done' : ''}" data-act="ideaStep" data-id="${o.id}" data-k="${k}" ${o.stage === 'guide' ? '' : 'disabled'} aria-pressed="${o.done.includes(k)}"><span class="bx">${o.done.includes(k) ? '✓' : ''}</span><span>${h(s)}</span></button>`).join('')}<div class="guard">Purser and Hermes never submit applications, open accounts, move money or make purchases. They explain, remind and track.</div></div>` : ''}
+    ${reached('track') ? `<div class="dsec"><div class="sublbl">Track</div>${o.reqs.map(r => `<div class="cu">${segMeter(r.cur/r.target, r.cur >= r.target ? 'sky' : 'peach', [], 25)}<div class="cu-f">${h(r.label)}: <b style="color:var(--ink)">${r.unit === '$' ? F.usd(r.cur, { cents:false }) + ' of ' + F.usd(r.target, { cents:false }) : r.cur + ' of ' + r.target + (r.unit === 'd' ? ' days' : '')}</b></div></div>`).join('')}${o.deadline ? `<div class="cu-f">Deadline ${F.dy(o.deadline)} · ${U.days(S.data.today, o.deadline)} days left</div>` : ''}</div>` : ''}
+    ${o.stage === 'reconcile' ? `<div class="dsec"><div class="sublbl">Reconcile · record what actually posted</div>
+      <div class="cpad" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <label class="fl" for="rc-amt-${o.id}">${o.realizeAs === 'saving' ? 'Verified monthly savings' : 'Amount posted'}<input id="rc-amt-${o.id}" class="txt-in num" inputmode="decimal" data-in="reconAmt" data-id="${o.id}" value="${h(rv.amt != null ? rv.amt : defaultRealize(o))}"></label>
+        ${o.realizeAs !== 'saving' && !o.pendingTxn ? `<label class="fl" for="rc-acct-${o.id}">Deposited to<select id="rc-acct-${o.id}" class="sel-in" data-in="reconAcct" data-id="${o.id}">${S.data.accounts.filter(a => a.group === 'cash' || a.group === 'credit').map(a => `<option value="${a.id}" ${(rv.acct || o.account) === a.id ? 'selected' : ''}>${h(a.name)}</option>`).join('')}</select></label>` : `<div class="cu-f" style="align-self:end">${o.pendingTxn ? 'Converts the existing pending record. It is not added twice.' : 'Recorded as Save with its baseline.'}</div>`}
+      </div>
+      <div class="acts" style="margin-top:12px"><button class="lb round" style="--c:var(--gold);height:42px" data-act="ideaRecord" data-id="${o.id}">Record as realized ${o.realizeAs === 'saving' ? 'Save' : 'Earn'}</button></div></div>` : ''}
+    <div class="acts">${actions}</div>`;
+}
+
+/* ── SETTINGS ── */
+function vSettings(C){
+  const u = S.ui, tog = (k, l, on, c) => `<div class="perm"><span>${l}</span><button class="lb round sm ${on ? 'on' : ''}" style="--c:var(--${c || 'lilac'})" data-act="toggle" data-id="${k}" aria-pressed="${on}">${on ? 'On' : 'Off'}</button></div>`;
+  const perm = (l, v, c) => `<div class="perm"><span>${l}</span><span class="chip ${v === 'NEVER' ? 'solid' : ''}" style="--c:var(--${c})">${v}</span></div>`;
+  return `<div class="grid">
+    <section class="s6" style="--i:0">${modHead('Skin', 'gold', '1 of 4 built')}
+      <div class="skins">${Object.entries(SKINS).map(([k, s]) => `<div class="skin ${s.status === 'active' ? 'cur' : ''}" style="--c:var(--${s.status === 'active' ? 'gold' : 'off'})"><div class="sw">${s.swatch.map(c => `<i style="background:${c}"></i>`).join('')}</div><b>${h(s.name)}</b><small>${h(s.note)}</small><span class="chip ${s.status === 'active' ? 'solid' : ''}" style="--c:var(--${s.status === 'active' ? 'gold' : 'ink-3'});align-self:flex-start">${s.status === 'active' ? 'Active' : 'Future skin'}</span></div>`).join('')}</div>
+      <div class="note" style="margin-top:12px">Skins change tokens, type, motion and the frame layout. Financial logic lives in the core and never changes with the skin.</div></section>
+    <section class="s6" style="--i:1">${modHead('Periods & reserve', 'sky')}
+      ${tog('includePending', 'Include pending in Month and Year (Lifetime is always realized only)', u.includePending, 'gold')}
+      <div class="perm"><span>Reserve window for upcoming obligations</span><span class="grp">${[14, 30, 45].map((n, i) => `<button class="lb sm ${i === 0 ? 'rl' : ''} ${i === 2 ? 'rr' : ''} ${u.reserveDays === n ? 'on' : ''}" style="--c:var(--peach)" data-act="reserve" data-id="${n}" aria-pressed="${u.reserveDays === n}">${n} days</button>`).join('')}</span></div>
+      <div class="note" style="--c:var(--peach);margin-top:8px">Reserved now: ${F.usd(C.alloc.reserved)} across ${C.alloc.resItems.length} bills. Free to Spend: ${F.usd(C.alloc.free)}.</div>
+      <div style="margin-top:22px">${modHead('Projects', 'tangerine')}${tog('gambling', 'Track the Gambling project', u.gambling, 'rose')}</div></section>
+    <section class="s6" style="--i:2">${modHead('Data source', 'alert', 'demo')}
+      <div class="perm"><span><b>Demo provider</b><br><small style="color:var(--ink-3)">Internally consistent sample ledger, ${S.data.tx.length} records over 22 months.</small></span><span class="chip solid" style="--c:var(--sky)">Active</span></div>
+      <div class="perm"><span><b>Local backend</b> on the Mac mini (SQLite + Plaid)<br><small style="color:var(--ink-3)">Planned endpoint http://127.0.0.1:8787/api · tokens stay server-side</small></span><span class="chip" style="--c:var(--ink-3)">Phase 2</span></div>
+      <div class="acts" style="margin-top:10px"><button class="lb round" disabled>Connect accounts with Plaid Link · Phase 2</button></div>
+      <div style="margin-top:22px">${modHead('Console', 'lilac')}${tog('audio', 'Console tones on button presses', u.audio)}${tog('reduceMotion', 'Reduce motion', u.reduceMotion)}
+        <div class="perm"><span>Reset all demo data and session changes</span><button class="lb round sm" style="--c:var(--${u.armReset ? 'alert' : 'rose'})" data-act="reset">${u.armReset ? 'Click again to confirm' : 'Reset demo'}</button></div></div></section>
+    <section class="s6" style="--i:3">${modHead('Hermes permissions', 'lavender', 'read-only default')}
+      ${perm('Read financial summaries', 'ALLOWED · PHASE 4', 'sky')}${perm('Categorize transactions', 'SUGGEST ONLY', 'gold')}${perm('Suggest cash-transfer matches', 'SUGGEST ONLY', 'gold')}${perm('Research opportunities', 'ALLOWED · PHASE 4', 'sky')}${perm('Explain trends', 'ALLOWED · PHASE 4', 'sky')}
+      ${perm('Move money or transfer funds', 'NEVER', 'rose')}${perm('Open accounts or submit applications', 'NEVER', 'rose')}${perm('Make purchases', 'NEVER', 'rose')}${perm('See Plaid access tokens or API secrets', 'NEVER', 'rose')}
+      <div class="note" style="--c:var(--rose);margin-top:8px">The NEVER rows are not settings. The backend will expose no API for them.</div></section>
+    <section class="s7" style="--i:4">${modHead('Accounting rules', 'gold', 'enforced in core')}<ol class="rules">
+      <li><span><b>Transfers are neither income nor spending.</b> They change which account holds the money, not how much you have.</span></li>
+      <li><span><b>Card payments are transfers.</b> The purchase counted once, when it was charged.</span></li>
+      <li><span><b>Loan payments are split.</b> Interest counts as Spend. Principal is a transfer to the loan.</span></li>
+      <li><span><b>Investing is an asset move.</b> Brokerage, IRA and crypto purchases are transfers, not consumption.</span></li>
+      <li><span><b>Resale separates proceeds from profit.</b> Payouts count in Earn. P/L against cost basis is shown in Resale.</span></li>
+      <li><span><b>Savings accrue as they happen.</b> One Save record per cheaper bill actually paid, with its baseline.</span></li>
+      <li><span><b>Refunds adjust Spend</b> in the period they post, linked to the original charge.</span></li>
+      <li><span><b>Projects are tags, not copies.</b> Totals read the ledger once, so overlap cannot inflate them.</span></li>
+      <li><span><b>Cash deposits and ATM withdrawals are transfers</b> with Cash on Hand, confirmed before they move.</span></li>
+      <li><span><b>Every record keeps its source and timestamp</b> (demo, manual, later Plaid).</span></li></ol></section>
+    <section class="s5" style="--i:5">${modHead('System schematic', 'violet', 'phase map')}<div class="schem">
+      <div style="--c:var(--alert)"><b>PROVIDER</b><span>MockProvider now. BackendProvider (localhost API) in Phase 2.</span></div>
+      <div style="--c:var(--gold)"><b>LEDGER</b><span>One record list, typed by kind. Accounting rules live here.</span></div>
+      <div style="--c:var(--sky)"><b>CALC</b><span>Pure functions: periods, metrics, allocation, credit, projects.</span></div>
+      <div style="--c:var(--peach)"><b>ACTIONS</b><span>Every change goes through one action map. Becomes API calls.</span></div>
+      <div style="--c:var(--lavender)"><b>SKIN</b><span>Tokens, fonts, motion, frame renderer. LCARS today.</span></div>
+      <div style="--c:var(--lilac)"><b>VIEWS</b><span>Overview, Accounts, Projects, Ideas, Settings.</span></div>
+      <div style="--c:var(--violet)"><b>HERMES</b><span>Read-only summary API plus suggestion queue. Phase 4.</span></div></div></section>
+  </div>`;
+}
+
+/* ── WIDGET ── */
+function renderWidget(C){
+  const m = C.m, A = C.alloc, next = A.obl[0], n = 20, freeOn = Math.round(A.free / Math.max(1, A.available) * n), resOn = Math.round(A.reserved / Math.max(1, A.available) * n);
+  let meter = ''; for (let i=0; i<n; i++) meter += `<i class="${i < freeOn ? 'on' : i < freeOn + resOn ? 'rs' : ''}"></i>`;
+  $('#widget').innerHTML = `<div class="w">
+    <div class="w-rail"><div class="w-el-t">${stardate()}</div><div class="w-mid"></div><div class="w-mid2">${C.rg.kind === 'month' ? 'MO' : C.rg.kind === 'year' ? 'YR' : 'LT'}</div><div class="w-el-b">01</div></div>
+    <div class="w-tb"><span class="w-t">PURSER</span><span class="s" style="--c:var(--gold)"></span><span class="s" style="--c:var(--peach);flex:0 0 26px"></span><span class="s cap" style="--c:var(--lavender)"></span></div>
+    <div class="w-fill"></div>
+    <div class="w-body">
+      <div class="w-r1"><span class="w-lbl">NET · ${h(C.rg.short)}${m.pendIncluded && (m.pend.earn || m.pend.spend) ? ' · INCL. PENDING' : ''}</span><span class="w-demo">DEMO DATA</span></div>
+      <div class="w-net num ${m.net < 0 ? 'neg' : ''}">${F.big(m.net)}</div>
+      <div class="w-formula">EARN + SAVE − SPEND</div>
+      <div class="w-trio"><div style="--c:var(--spend)"><span>SPEND</span><b>${F0(m.spend)}</b></div><div style="--c:var(--earn)"><span>EARN</span><b>${F0(m.earn)}</b></div><div style="--c:var(--save)"><span>SAVE</span><b>${F0(m.save)}</b></div></div>
+      <div class="w-free"><div class="row"><span>FREE TO SPEND</span><b class="num">${F0(A.free)}</b></div><div class="w-meter" aria-hidden="true">${meter}</div></div>
+      ${next ? `<div class="w-next">NEXT · ${h(next.name.toUpperCase())} ${F0(next.amount)} · ${F.d(next.due)}</div>` : ''}
+    </div>
+    <div class="w-bb"><span class="s" style="--c:var(--lilac)"></span><span class="s" style="--c:var(--violet);flex:0 0 30px"></span><span class="w-exp">EXPAND ▸</span></div>
+  </div>`;
+}
+
+/* ── SHELL: the compact ⇄ console transition ── */
+const reduced = () => S.ui.reduceMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
+const Shell = {
+  busy:false,
+  insetFor(r){ return `inset(${r.top}px ${innerWidth - r.right}px ${innerHeight - r.bottom}px ${r.left}px round 28px)`; },
+  ghost(from, to, dur, delay){
+    const g = $('#ghost'); g.hidden = false;
+    const k = r => ({ left:r.left+'px', top:r.top+'px', width:r.width+'px', height:r.height+'px' });
+    const a = g.animate([Object.assign(k(from), { opacity:1, borderRadius:'28px' }), Object.assign(k(to), { opacity:.9, borderRadius:to.width > 600 ? '0px' : '28px', offset:.85 }), Object.assign(k(to), { opacity:0, borderRadius:to.width > 600 ? '0px' : '28px' })], { duration:dur, delay, easing:'cubic-bezier(.76,0,.24,1)', fill:'both' });
+    a.finished.then(() => { g.hidden = true; a.cancel(); }).catch(() => {});
+  },
+  async expand(){
+    if (S.ui.expanded || this.busy) return; this.busy = true;
+    const w = $('#widget'), c = $('#console'), r = w.getBoundingClientRect();
+    S.ui.expanded = true; savePrefs(); lastView = null; beep(880, .05); setTimeout(() => beep(1320, .07), 90);
+    render();
+    c.hidden = false;
+    if (reduced()){ w.classList.add('gone'); this.busy = false; prevVals = {}; scrambleChanged(false); $('#main').focus({ preventScroll:true }); return; }
+    c.classList.add('boot'); w.classList.add('launch');
+    const full = { left:0, top:0, width:innerWidth, height:innerHeight };
+    this.ghost(r, full, 900, 60);
+    const a = c.animate([{ clipPath:this.insetFor(r) }, { clipPath:'inset(0px 0px 0px 0px round 0px)' }], { duration:SKINS.lcars.motion.expandMs, delay:120, easing:'cubic-bezier(.76,0,.24,1)', fill:'backwards' });
+    setTimeout(() => scrambleChanged(true), 820);
+    try { await a.finished; } catch(e){}
+    w.classList.add('gone'); w.classList.remove('launch');
+    setTimeout(() => { c.classList.remove('boot'); }, 1500);
+    this.busy = false; const mm = $('#main'); if (mm) mm.focus({ preventScroll:true });
+  },
+  async collapse(){
+    if (!S.ui.expanded || this.busy) return; this.busy = true;
+    const w = $('#widget'), c = $('#console');
+    S.ui.expanded = false; savePrefs(); beep(1320, .05); setTimeout(() => beep(880, .07), 90);
+    renderWidget(CTX || compute()); w.classList.remove('gone');
+    const r = w.getBoundingClientRect();
+    if (reduced()){ c.hidden = true; c.innerHTML = ''; this.busy = false; w.focus(); return; }
+    w.style.opacity = '0'; c.classList.remove('boot'); c.classList.add('shutdown');
+    this.ghost({ left:0, top:0, width:innerWidth, height:innerHeight }, r, 700, 140);
+    const a = c.animate([{ clipPath:'inset(0px 0px 0px 0px round 0px)' }, { clipPath:this.insetFor(r) }], { duration:SKINS.lcars.motion.collapseMs, delay:140, easing:'cubic-bezier(.7,0,.3,1)', fill:'forwards' });
+    try { await a.finished; } catch(e){}
+    c.hidden = true; c.classList.remove('shutdown'); a.cancel(); c.innerHTML = '';
+    w.style.opacity = ''; w.classList.add('arrive'); w.animate([{ opacity:0, transform:'scale(.96)' }, { opacity:1, transform:'none' }], { duration:300, easing:'ease-out' });
+    setTimeout(() => w.classList.remove('arrive'), 800);
+    this.busy = false; w.focus({ preventScroll:true });
+  },
+};
+
+/* ── Audio, toast, stars, clock ── */
+let actx = null;
+function beep(f, d){ if (!S.ui.audio) return; try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime; o.type = 'sine'; o.frequency.value = f || 1350; g.gain.setValueAtTime(.05, t); g.gain.exponentialRampToValueAtTime(.0001, t + (d || .05)); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + (d || .05) + .02); } catch(e){} }
+let toastT = null;
+function toast(msg, c){ const t = $('#toast'); t.style.setProperty('--c', 'var(--' + (c || 'gold') + ')'); t.querySelector('.tt').textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 4200); }
+function drawStars(){
+  const cv = $('#stars'), dpr = Math.min(2, devicePixelRatio || 1), w = innerWidth, ht = innerHeight; cv.width = w*dpr; cv.height = ht*dpr;
+  const x = cv.getContext('2d'); x.scale(dpr, dpr); const rnd = U.rng(47); x.clearRect(0, 0, w, ht);
+  for (let i=0; i<Math.round(w*ht/2600); i++){ const s = rnd(); x.globalAlpha = .25 + rnd()*.6; x.fillStyle = s > .93 ? '#ffd9a8' : s > .86 ? '#c9d6ff' : '#ffffff'; const rr = s > .97 ? 1.4 : s > .8 ? .9 : .55; x.beginPath(); x.arc(rnd()*w, rnd()*ht, rr, 0, 6.283); x.fill(); }
+  x.globalAlpha = 1;
+}
+function tickClock(){ const t = new Date(); $('#mb-clock').textContent = t.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + '  ' + t.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }); }
+
+/* ── Widget placement + drag ── */
+function placeWidget(x, y){
+  const w = $('#widget'), ww = w.offsetWidth, wh = w.offsetHeight;
+  x = Math.max(8, Math.min(innerWidth - ww - 8, x)); y = Math.max(36, Math.min(innerHeight - wh - 8, y));
+  w.style.left = x + 'px'; w.style.top = y + 'px'; w.style.right = 'auto'; S.ui.wpos = { x, y };
+}
+function initWidget(){
+  const w = $('#widget');
+  if (S.ui.wpos) placeWidget(S.ui.wpos.x, S.ui.wpos.y);
+  else if (innerWidth < 560) placeWidget((innerWidth - w.offsetWidth)/2, 48);
+  let drag = null;
+  w.addEventListener('pointerdown', e => { if (e.button !== 0 || Shell.busy) return; const r = w.getBoundingClientRect(); drag = { x:e.clientX, y:e.clientY, ox:r.left, oy:r.top, moved:false }; try { w.setPointerCapture(e.pointerId); } catch(_){} });
+  w.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 6) return; drag.moved = true; w.classList.add('dragging'); placeWidget(drag.ox + dx, drag.oy + dy); });
+  const end = () => { if (!drag) return; const moved = drag.moved; drag = null; w.classList.remove('dragging'); if (moved) savePrefs(); else Shell.expand(); };
+  w.addEventListener('pointerup', end);
+  w.addEventListener('pointercancel', () => { drag = null; w.classList.remove('dragging'); });
+  w.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); Shell.expand(); } });
+}
+
+/* ── Events ── */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled || !A[el.dataset.act]) return;
+  if (el.dataset.act !== 'collapse') beep(1350, .04);
+  if (el.dataset.act !== 'reset' && S.ui.armReset) S.ui.armReset = false;
+  const res = A[el.dataset.act](el, e);
+  if (res !== false){ savePrefs(); render(); }
+});
+document.addEventListener('pointerover', e => {
+  const el = e.target.closest && e.target.closest('[data-hover]'); if (!el || !CTX || !CTX.series) return;
+  const ro = $('#readout'); if (ro) ro.innerHTML = readoutHTML(CTX.series[+el.dataset.hover]);
+});
+const IN = {
+  cashAmt(el){ let v = el.value.replace(/[^0-9.]/g, ''); const p = v.split('.'); if (p.length > 2) v = p[0] + '.' + p.slice(1).join(''); if (p[1] && p[1].length > 2) v = p[0] + '.' + p[1].slice(0, 2); S.ui.cashAmt = v; const pv = $('#cash-preview'); if (pv) pv.innerHTML = cashPreview(); },
+  cashNote(el){ S.ui.cashNote = el.value; },
+  reconAmt(el){ (S.ui.recon[el.dataset.id] = S.ui.recon[el.dataset.id] || {}).amt = el.value.replace(/[^0-9.]/g, ''); },
+  reconAcct(el){ (S.ui.recon[el.dataset.id] = S.ui.recon[el.dataset.id] || {}).acct = el.value; },
+};
+document.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.in; if (k && IN[k]) IN[k](e.target); });
+document.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.in; if (k && IN[k]) IN[k](e.target); });
+document.addEventListener('focusout', e => { if (e.target.id === 'cash-amt' && S.ui.cashAmt) e.target.value = '$' + S.ui.cashAmt; });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && S.ui.expanded){ e.preventDefault(); Shell.collapse(); return; }
+  if (!S.ui.expanded || e.metaKey || e.ctrlKey || e.altKey) return;
+  const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+  const i = +e.key; if (i >= 1 && i <= VIEWS.length){ S.ui.view = VIEWS[i-1].id; savePrefs(); render(); }
+});
+let rzT = null;
+addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { drawStars(); if (S.ui.wpos) placeWidget(S.ui.wpos.x, S.ui.wpos.y); }, 120); });
+
+/* ── Boot ── */
+applySkin('lcars');
+document.documentElement.classList.toggle('reduce', !!S.ui.reduceMotion);
+drawStars(); tickClock(); setInterval(tickClock, 15000);
+const startExpanded = S.ui.expanded; S.ui.expanded = false;
+render(); initWidget();
+if (startExpanded){ S.ui.expanded = true; lastView = null; $('#console').hidden = false; render(); $('#widget').classList.add('gone'); }
+else if (!savedPrefs) setTimeout(() => { if (!S.ui.expanded) Shell.expand(); }, 1300);
+</script>
